@@ -8,7 +8,9 @@ mded is a markdown viewer and editor for the terminal.
 
 - **View mode.** The document shows as formatted markdown: heading bars, lists, checkboxes, links, quotes, rules, code with syntax colors, and tables.
 - **Edit mode with a live preview.** The line with the cursor shows its source. All other lines show formatted.
-- **Two edit modes.** A conventional mode (as in most text editors) and a vim mode. `ctrl+g` changes between them.
+- **Conventional edit mode**, as in most text editors: arrow keys, `shift` selection, the system clipboard, undo and redo, format keys (bold, italic, link, checkbox), and find and replace.
+- **Vim edit mode**: normal, insert, replace, visual, and visual line modes, with motions, operators, text objects, counts, registers, marks, macros, `.` repeat, and `:s`.
+- `ctrl+g` changes between the two edit modes. `default_mode` in the config file or `--vim` sets the mode at the start.
 - **Search with `/`**, as in neovim: regular expressions, smartcase, incremental search, and highlights of all matches.
 - **Pictures** in kitty and Ghostty, through the kitty graphics protocol, and a picker that inserts pictures.
 - **Sidebar** with a directory tree, a filter, and file operations.
