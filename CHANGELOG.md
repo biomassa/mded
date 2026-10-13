@@ -10,6 +10,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Added
 
 - In view mode, a mouse drag selects text. When you release the button, mded copies the markdown source of the selection to the system clipboard.
+- Code blocks in shell languages (sh, bash, zsh, shell, console) show commands, flags, and operators in colors.
 - The help (`?`, `F1`) shows the keys of all modes. The keys of the current mode come first. Long descriptions wrap.
 
 ### Changed

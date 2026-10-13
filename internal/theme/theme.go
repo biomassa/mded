@@ -237,7 +237,7 @@ func themeReader(st *gansi.StyleConfig) {
 	st.CodeBlock.Chroma = &gansi.Chroma{
 		Text: prim(Text), Error: prim(Error), Comment: prim(Muted), CommentPreproc: prim(Muted),
 		Keyword: prim(Link), KeywordReserved: prim(Link), KeywordNamespace: prim(Link), KeywordType: prim(Purple),
-		Operator: prim(Text), Punctuation: prim(Muted), Name: prim(Text), NameBuiltin: prim(Purple),
+		Operator: prim(Purple), Punctuation: prim(Muted), Name: prim(Text), NameBuiltin: prim(Purple),
 		NameTag: prim(Link), NameAttribute: prim(Warn), NameClass: prim(Purple), NameConstant: prim(Warn),
 		NameDecorator: prim(Warn), NameFunction: prim(Link), Literal: prim(Warn),
 		LiteralNumber: prim(Warn), LiteralString: prim(Good), LiteralStringEscape: prim(Purple),
