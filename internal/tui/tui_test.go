@@ -421,13 +421,13 @@ func TestSidebarKeys(t *testing.T) {
 	if m.showTree || m.focus != focusDoc {
 		t.Errorf("hide: show=%v focus=%v", m.showTree, m.focus)
 	}
-	press(m, "ctrl+w", "w") // shows and focuses the sidebar
+	press(m, "ctrl+e") // shows and focuses the sidebar
 	if m.focus != focusTree || !m.showTree {
-		t.Errorf("ctrl+w w: focus=%v", m.focus)
+		t.Errorf("ctrl+e: focus=%v", m.focus)
 	}
-	press(m, "ctrl+w", "w")
+	press(m, "ctrl+e")
 	if m.focus != focusDoc {
-		t.Error("ctrl+w w back")
+		t.Error("ctrl+e back")
 	}
 	press(m, "alt+l")
 	if m.focus != focusDoc {
@@ -563,18 +563,14 @@ func TestFlavorSwitch(t *testing.T) {
 	if m.mode != modeEdit || m.km.ModeLabel() != "EDIT" {
 		t.Error("the switch must keep edit mode with the conventional keymap")
 	}
-	// ctrl+w w works in vim normal mode, not in conventional edit mode.
+	// ctrl+e switches the focus in all edit modes.
 	press(m, "ctrl+g")
-	press(m, "ctrl+w", "w")
+	fv.normal = false
+	press(m, "ctrl+e")
 	if m.focus != focusTree {
-		t.Error("ctrl+w w in vim normal mode")
+		t.Error("ctrl+e in vim insert mode")
 	}
 	press(m, "alt+l")
-	fv.normal = false
-	press(m, "ctrl+w")
-	if m.ctrlW {
-		t.Error("ctrl+w must go to the vim engine outside normal mode")
-	}
 	press(m, "esc")
 	if m.mode != modeView {
 		t.Error("esc did not leave edit mode")

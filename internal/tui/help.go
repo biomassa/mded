@@ -115,7 +115,7 @@ var (
 	globalHelp = []helpKey{
 		{"", "Everywhere"},
 		{"ctrl+`", "show or hide the sidebar"},
-		{"ctrl+w w", "switch the focus (view and vim normal mode)"},
+		{"ctrl+e", "switch the focus between the sidebar and the document"},
 		{"alt+h, alt+l", "focus the sidebar, the document"},
 		{"ctrl+g", "switch the edit flavor"},
 		{"F1", "this help"},

@@ -149,7 +149,7 @@ func (v *Vim) Mode() string {
 }
 
 // Normal reports whether the engine is in normal mode with no pending key and no prompt.
-// The UI handles its own keys (ctrl+w w, alt+h, alt+l) in this state.
+// The UI handles its own keys (ctrl+e, alt+h, alt+l) before the engine.
 func (v *Vim) Normal() bool {
 	return v.mode == modeNormal && len(v.pending) == 0 && v.prompt == nil && v.conf == nil &&
 		v.putReq == nil

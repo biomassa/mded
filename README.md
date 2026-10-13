@@ -152,7 +152,7 @@ mded shows pictures in terminals with the kitty graphics protocol: kitty and Gho
 
 ## Sidebar
 
-`ctrl+`` shows or hides the sidebar. `ctrl+w w`, `alt+h`, and `alt+l` move the focus between the sidebar and the document.
+`ctrl+`` shows or hides the sidebar. `ctrl+e` moves the focus between the sidebar and the document, in all modes. `alt+h` moves the focus to the sidebar, and `alt+l` to the document.
 
 | Key | Action |
 |---|---|
@@ -166,7 +166,7 @@ mded shows pictures in terminals with the kitty graphics protocol: kitty and Gho
 | `delete` | Delete. mded asks first. |
 | `ctrl+h` | Show or hide hidden files. |
 
-`alt+h` and `ctrl+w w` also show a hidden sidebar.
+`ctrl+e` and `alt+h` also show a hidden sidebar.
 
 The sidebar shows all files. Markdown files open formatted. Other text files open as plain text. Picture files show the picture. mded does not open other binary files.
 

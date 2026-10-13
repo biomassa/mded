@@ -109,7 +109,6 @@ type Model struct {
 	help       *helpState
 	themes     *themePicker
 	img        *imagePicker
-	ctrlW      bool
 
 	// The status line.
 	msg    string
@@ -357,24 +356,15 @@ func (m *Model) key(msg tea.KeyPressMsg) {
 		case k == "ctrl+g":
 			m.switchFlavor()
 			return
-		}
-		if m.ctrlW {
-			m.ctrlW = false
-			if k == "w" {
-				if m.focus == focusTree {
-					m.focusPane(focusDoc)
-				} else {
-					m.focusPane(focusTree)
-				}
-				return
+		case k == "ctrl+e": // switch the focus. A hidden sidebar shows.
+			if m.focus == focusTree {
+				m.focusPane(focusDoc)
+			} else {
+				m.focusPane(focusTree)
 			}
-		}
-		if k == "ctrl+w" && (m.focus == focusTree || m.mode == modeView || m.vimFlavor && m.normal()) {
-			m.ctrlW = true
 			return
 		}
 	}
-	m.ctrlW = false
 	switch {
 	case m.focus == focusTree:
 		m.treeKey(msg)
