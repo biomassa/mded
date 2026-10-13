@@ -68,6 +68,7 @@ mded keeps the file mode, the line endings, and the last line ending of the file
 | `tab`, `shift+tab` | Select the next or the previous checkbox or link. |
 | `space` | Change the selected checkbox. |
 | `enter` | Follow the selected link. |
+| `enter` | With no selected item and with the search highlights on: edit at the current match. |
 | `backspace`, `ctrl+o` | Go back to the previous document. |
 | `e`, `i` | Edit. |
 | `T` | Open the theme picker. |
@@ -84,6 +85,7 @@ A link to a file opens the file in mded. A link with `#heading` goes to that hea
 - mded goes to the first match while you type, and highlights all matches. `enter` keeps the position, and `esc` goes back.
 - The highlights stay until you push `esc` in view mode, type `:noh` in vim mode, or start a new search.
 - `n` and `N` go to the next and the previous match. At the end of the file, the search continues at the start.
+- In view mode, `enter` opens edit mode with the cursor at the start of the current match.
 - `↑` and `↓` in the prompt show the earlier patterns.
 
 ## Conventional mode

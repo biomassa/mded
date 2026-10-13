@@ -56,8 +56,15 @@ func (m *Model) viewKey(msg tea.KeyPressMsg) {
 	case "shift+tab":
 		m.moveItem(-1)
 	case "enter":
-		if it, ok := m.selectedItem(); ok && it.Kind == markdown.Link {
-			m.followLink(it.URL)
+		// A selected item (tab) comes first. Else, while the search highlights are on,
+		// enter edits the document at the current match.
+		if it, ok := m.selectedItem(); ok {
+			if it.Kind == markdown.Link {
+				m.followLink(it.URL)
+			}
+		} else if s := &m.doc.buf.Search; s.Highlight && s.Cur >= 0 && s.Cur < len(s.Matches) {
+			mt := s.Matches[s.Cur]
+			m.enterEdit(&[2]int{mt.Row, mt.A})
 		}
 	case "backspace", "ctrl+o":
 		m.back()

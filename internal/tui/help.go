@@ -51,6 +51,7 @@ var (
 		{"tab, shift+tab", "select a checkbox or a link"},
 		{"space", "toggle the selected checkbox"},
 		{"enter", "follow the selected link"},
+		{"enter", "edit at the current match (search highlights on)"},
 		{"backspace, ctrl+o", "back to the previous document"},
 		{"esc", "clear the search highlight"},
 		{"e, i", "edit"},

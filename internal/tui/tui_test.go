@@ -326,6 +326,30 @@ func TestViewSearch(t *testing.T) {
 	}
 }
 
+// enter after a search edits the document at the current match. Without the highlight,
+// enter does not edit.
+func TestEnterEditsAtMatch(t *testing.T) {
+	p := writeTemp(t, "a.md", "one\ntwo words here\nthree\n", 0o644)
+	m := testModel(t, p)
+	press(m, "enter")
+	if m.mode == modeEdit {
+		t.Fatal("enter with no search opened edit mode")
+	}
+	press(m, "/")
+	typeText(m, "words")
+	press(m, "enter")
+	if m.mode == modeEdit {
+		t.Fatal("the prompt enter opened edit mode")
+	}
+	press(m, "enter")
+	if b := m.doc.buf; m.mode != modeEdit || b.Row != 1 || b.Col != 4 {
+		t.Errorf("mode %v, cursor %d:%d", m.mode, b.Row, b.Col)
+	}
+	if !m.doc.buf.Search.Highlight {
+		t.Error("the highlight went off")
+	}
+}
+
 func TestSearchShowsSourceOnlyForMatches(t *testing.T) {
 	p := writeTemp(t, "a.md", "# Title\n\nsome **bold** text\nother **bold** line\n", 0o644)
 	m := testModel(t, p)
