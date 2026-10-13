@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-13
+
 ### Added
 
 - In view mode, a mouse drag selects text. When you release the button, mded copies the markdown source of the selection to the system clipboard.
@@ -40,5 +42,6 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Color themes from godoist, with a theme picker (`T`). Each heading level has its own color in all themes.
 - A config file: `~/.config/mded/config.toml`.
 
-[Unreleased]: https://github.com/biomassa/mded/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/biomassa/mded/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/biomassa/mded/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/biomassa/mded/releases/tag/v0.1.0
