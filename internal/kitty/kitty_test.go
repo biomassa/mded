@@ -48,12 +48,17 @@ func TestFitCells(t *testing.T) {
 func TestChunking(t *testing.T) {
 	b64 := strings.Repeat("A", 4096*2+10)
 	seq := transmitSeq(7, 3, 2, b64)
+	// The cursor save and restore enclose the sequence.
+	if !strings.HasPrefix(seq, "\x1b7") || !strings.HasSuffix(seq, "\x1b8") {
+		t.Fatalf("no cursor save and restore: %q … %q", seq[:8], seq[len(seq)-8:])
+	}
+	seq = strings.TrimSuffix(strings.TrimPrefix(seq, "\x1b7"), "\x1b8")
 	parts := strings.Split(strings.TrimSuffix(seq, "\x1b\\"), "\x1b\\")
 	if len(parts) != 3 {
 		t.Fatalf("chunks = %d, want 3", len(parts))
 	}
 	wantHead := []string{
-		"\x1b_Ga=T,q=2,f=100,t=d,i=7,U=1,c=3,r=2,m=1;",
+		"\x1b_Ga=T,q=2,C=1,f=100,t=d,i=7,U=1,c=3,r=2,m=1;",
 		"\x1b_Gm=1;",
 		"\x1b_Gm=0;",
 	}

@@ -14,6 +14,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- The screen does not shift up by one row when a picture loads. The picture transmit did not keep the cursor in place, so the terminal scrolled at the bottom row. Before, the screen was correct only after a resize.
 - Inline markdown in bold, italic, strikethrough, and link text shows formatted. Before, code in bold text showed its backticks.
 
 ## [0.1.1] - 2026-10-13

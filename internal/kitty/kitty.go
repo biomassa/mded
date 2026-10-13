@@ -281,9 +281,13 @@ func scalePNG(src image.Image, w, h int) ([]byte, error) {
 }
 
 // transmitSeq builds the chunked transmit sequence for base64 data.
-// Only the first chunk carries the keys.
+// Only the first chunk carries the keys. C=1 tells the terminal not to move the cursor, and
+// the save (ESC 7) and restore (ESC 8) of the cursor around the sequence keep the cursor
+// where the UI renderer has it. A cursor move would make the terminal scroll at the bottom
+// row, and then the screen would not agree with the renderer until a full redraw.
 func transmitSeq(id uint32, cols, rows int, b64 string) string {
 	var sb strings.Builder
+	sb.WriteString("\x1b7")
 	for first := true; ; first = false {
 		chunk := b64
 		if len(chunk) > chunkSize {
@@ -295,12 +299,13 @@ func transmitSeq(id uint32, cols, rows int, b64 string) string {
 			more = 1
 		}
 		if first {
-			fmt.Fprintf(&sb, "\x1b_Ga=T,q=2,f=100,t=d,i=%d,U=1,c=%d,r=%d,m=%d;%s\x1b\\",
+			fmt.Fprintf(&sb, "\x1b_Ga=T,q=2,C=1,f=100,t=d,i=%d,U=1,c=%d,r=%d,m=%d;%s\x1b\\",
 				id, cols, rows, more, chunk)
 		} else {
 			fmt.Fprintf(&sb, "\x1b_Gm=%d;%s\x1b\\", more, chunk)
 		}
 		if more == 0 {
+			sb.WriteString("\x1b8")
 			return sb.String()
 		}
 	}
