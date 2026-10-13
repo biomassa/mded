@@ -41,6 +41,10 @@ func (b *Buffer) DeleteRange(r1, c1, r2, c2 int) string {
 		b.Lines[r1] = splice(b.Lines[r1], c1, len(b.Lines[r1]), b.Lines[r2][c2:])
 		b.Lines = append(b.Lines[:r1+1], b.Lines[r2+1:]...)
 		b.touch()
+		if r2 > r1 {
+			b.shift(Shift{At: r1 + 1, N: -(r2 - r1 - 1)}) // the lines between go away
+			b.shift(Shift{At: r1 + 1, N: -1, Join: true, Col: c1 - c2})
+		}
 	}
 	b.Row, b.Col, b.Want = r1, c1, -1
 	return text
@@ -70,6 +74,7 @@ func (b *Buffer) DeleteLines(r1, r2 int) string {
 	r1, r2 = b.rowSpan(r1, r2)
 	text := b.YankLines(r1, r2)
 	b.Lines = append(b.Lines[:r1], b.Lines[r2+1:]...)
+	b.shift(Shift{At: r1, N: -(r2 - r1 + 1)})
 	if len(b.Lines) == 0 {
 		b.Lines = [][]rune{{}}
 	}
@@ -84,6 +89,7 @@ func (b *Buffer) InsertLines(at int, text string) {
 	at = max(0, min(at, len(b.Lines)))
 	ls := splitRunes(strings.ReplaceAll(text, "\r\n", "\n"))
 	b.Lines = append(b.Lines[:at], append(ls, b.Lines[at:]...)...)
+	b.shift(Shift{At: at, N: len(ls)})
 	b.Row, b.Col, b.Want = at, 0, -1
 	b.touch()
 }
@@ -118,6 +124,7 @@ func (b *Buffer) JoinLines(n int, withSpace bool) bool {
 	}
 	b.Lines[b.Row] = cur
 	b.Lines = append(b.Lines[:b.Row+1], b.Lines[last+1:]...)
+	b.shift(Shift{At: b.Row + 1, N: -(last - b.Row), Join: true})
 	b.Col, b.Want = col, -1
 	b.touch()
 	return true

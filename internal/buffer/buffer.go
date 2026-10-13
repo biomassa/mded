@@ -34,6 +34,10 @@ type Buffer struct {
 
 	Search Search // shared by view mode, conventional edit, and vim
 
+	// OnShift, if set, is called when an edit adds or removes whole lines. The vim engine
+	// uses it to keep its marks on the right lines. Undo and redo do not call it.
+	OnShift func(Shift)
+
 	undo, redo []state
 	typing     bool  // the last change was typing, so the next letter joins its undo step
 	depth      int   // nesting of BeginChange
@@ -41,6 +45,23 @@ type Buffer struct {
 	beginRev   int
 	dirtyRev   int // Rev for which dirtyVal is valid
 	dirtyVal   bool
+}
+
+// Shift describes an edit that moved lines. N above 0 means that N lines came in before
+// line At: the lines from At on moved down. N below 0 means that the lines At to At-N-1 went
+// away: the lines after them moved up. With Join, the removed lines were joined to line At-1
+// (the text of the lines stays), and a position in them moves to that line at column + Col.
+type Shift struct {
+	At, N int
+	Join  bool
+	Col   int
+}
+
+// shift tells the OnShift function about an edit.
+func (b *Buffer) shift(s Shift) {
+	if b.OnShift != nil && s.N != 0 {
+		b.OnShift(s)
+	}
 }
 
 // New returns a buffer that holds text, marked as saved.

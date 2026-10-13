@@ -1,6 +1,7 @@
 package vim
 
 import (
+	"sort"
 	"strings"
 	"unicode"
 )
@@ -86,62 +87,223 @@ func (v *Vim) wordObj(inner, big bool, n int) (region, bool) {
 	return region{r1: row, c1: a, r2: row, c2: z}, true
 }
 
-// sentenceObj finds is or as inside the cursor line. A sentence ends at ., !, or ? that
-// a blank or the line end follows.
-func (v *Vim) sentenceObj(inner bool, n int) (region, bool) {
-	b := v.b
-	l := b.Lines[b.Row]
-	row := b.Row
-	type seg struct{ s, e int }
-	var segs []seg
-	for i := 0; i < len(l); {
-		for i < len(l) && unicode.IsSpace(l[i]) {
-			i++
+// sentPiece is one part of the text for the sentence objects. The parts do not overlap. The
+// text between two parts (a line break before empty lines) belongs to no part.
+type sentPiece struct {
+	s, e  int  // offsets in the text with line breaks, e is not in the part
+	white bool // blanks, not a sentence
+	trail bool // white that as takes after a sentence
+	lead  bool // white that as takes before a sentence
+	blank bool // the white has a space or a tab (a line break alone does not count)
+	brk   bool // the empty lines between two paragraphs
+	nl    bool // the line break before the empty lines
+}
+
+// sentPieces cuts text into sentences and white parts. A sentence ends at ., !, or ? with
+// closing chars ) ] " ' after it, if a blank or the end of the text follows. A paragraph
+// boundary (an empty line) ends a sentence too.
+func sentPieces(t []rune) []sentPiece {
+	var ps []sentPiece
+	for i := 0; i < len(t); {
+		if unicode.IsSpace(t[i]) {
+			j := i
+			for j < len(t) && unicode.IsSpace(t[j]) {
+				j++
+			}
+			ps = appendWhite(ps, t, i, j)
+			i = j
+			continue
 		}
-		if i >= len(l) {
-			break
-		}
-		s := i
-		for i < len(l) {
-			if strings.ContainsRune(".!?", l[i]) {
-				j := i + 1
-				for j < len(l) && strings.ContainsRune(")]\"'", l[j]) {
-					j++
+		j := i
+		for j < len(t) {
+			if t[j] == '\n' && j+1 < len(t) && t[j+1] == '\n' {
+				break
+			}
+			if strings.ContainsRune(".!?", t[j]) {
+				k := j + 1
+				for k < len(t) && strings.ContainsRune(")]\"'", t[k]) {
+					k++
 				}
-				if j >= len(l) || unicode.IsSpace(l[j]) {
-					i = j
+				j = k
+				if k >= len(t) || unicode.IsSpace(t[k]) {
 					break
 				}
-				i = j
 				continue
 			}
-			i++
+			j++
 		}
-		segs = append(segs, seg{s, i})
+		e := j
+		for e > i && unicode.IsSpace(t[e-1]) {
+			e--
+		}
+		ps = append(ps, sentPiece{s: i, e: e})
+		i = e
 	}
-	idx := -1
-	for k, sg := range segs {
-		if b.Col < sg.e || k == len(segs)-1 && b.Col >= sg.s {
-			idx = k
+	return ps
+}
+
+// appendWhite adds the blanks t[i:j] as one part. Empty lines in them split the blanks into
+// the end of the line before, the empty lines, and the indent of the line after.
+func appendWhite(ps []sentPiece, t []rune, i, j int) []sentPiece {
+	p := -1
+	for k := i; k+1 < j; k++ {
+		if t[k] == '\n' && t[k+1] == '\n' {
+			p = k
 			break
 		}
 	}
-	if idx < 0 {
+	blank := func(a, z int) bool {
+		for _, r := range t[a:z] {
+			if r == ' ' || r == '\t' {
+				return true
+			}
+		}
+		return false
+	}
+	if p < 0 {
+		return append(ps, sentPiece{s: i, e: j, white: true, trail: true, lead: true, blank: blank(i, j)})
+	}
+	q := j - 1
+	for t[q] != '\n' {
+		q--
+	}
+	start := p + 1
+	if i == 0 { // empty lines at the start of the text
+		start = 0
+	}
+	if p > i {
+		ps = append(ps, sentPiece{s: i, e: p, white: true, trail: true, blank: blank(i, p)})
+	}
+	if i > 0 {
+		ps = append(ps, sentPiece{s: p, e: p + 1, white: true, nl: true})
+	}
+	ps = append(ps, sentPiece{s: start, e: q + 1, white: true, brk: true})
+	if q+1 < j {
+		ps = append(ps, sentPiece{s: q + 1, e: j, white: true, lead: true, blank: blank(q+1, j)})
+	}
+	return ps
+}
+
+// sentenceObj finds is or as, over line breaks. is takes the sentence, or the white part,
+// at the cursor, and n-1 parts after it. as takes a sentence with the blanks after it, or
+// before it if no blanks follow. On blanks, as takes the blanks and the next sentence.
+func (v *Vim) sentenceObj(inner bool, n int) (region, bool) {
+	b := v.b
+	var t []rune
+	starts := make([]int, len(b.Lines))
+	for r, l := range b.Lines {
+		starts[r] = len(t)
+		t = append(t, l...)
+		if r < len(b.Lines)-1 {
+			t = append(t, '\n')
+		}
+	}
+	ps := sentPieces(t)
+	if len(ps) == 0 {
 		return region{}, false
 	}
-	s, e := segs[idx].s, segs[min(idx+n-1, len(segs)-1)].e
-	if !inner {
-		if e < len(l) && unicode.IsSpace(l[e]) {
-			for e < len(l) && unicode.IsSpace(l[e]) {
-				e++
+	off := starts[b.Row] + min(b.Col, len(b.Lines[b.Row]))
+	idx := -1
+	for k, p := range ps {
+		if p.s <= off {
+			idx = k // the last part that starts at or before the cursor
+		}
+	}
+	idx = max(idx, 0)
+	s, e := ps[idx].s, ps[idx].e
+	if ps[idx].brk && n == 1 { // one empty line
+		row := max(0, min(len(starts)-1, sort.Search(len(starts), func(i int) bool { return starts[i] > off })-1))
+		if starts[row] >= s && starts[row] < e {
+			s, e = starts[row], min(starts[row]+1, e)
+		}
+		return v.pieceRegion(starts, s, e), true
+	}
+	j := idx + 1
+	if inner {
+		e = ps[min(idx+n-1, len(ps)-1)].e
+	} else {
+		trailing := func() bool { return j < len(ps) && ps[j].white && ps[j].trail && ps[j].blank }
+		blanks := ps[idx].white
+		j = idx
+		if blanks { // blanks: they and the next sentence
+			j++
+		}
+		lastTrail := true
+		if !ps[idx].brk { // empty lines: only they
+			for k := 0; k < n; k++ {
+				if j < len(ps) && ps[j].nl { // a paragraph boundary counts as a sentence
+					e = ps[j].e
+					j++
+					if j < len(ps) && ps[j].brk {
+						e = ps[j].e
+						j++
+					}
+					lastTrail = true
+					continue
+				}
+				if k > 0 && j+1 < len(ps) && ps[j].white && ps[j].trail && !ps[j+1].white {
+					j++ // a line break between two sentences
+				}
+				if j >= len(ps) || ps[j].white {
+					break
+				}
+				e = ps[j].e
+				j++
+				lastTrail = false
+				if (!blanks || k < n-1) && trailing() {
+					e = ps[j].e
+					j++
+					lastTrail = true
+				}
 			}
-		} else {
-			for s > 0 && unicode.IsSpace(l[s-1]) {
-				s--
+		}
+		if !blanks && !lastTrail && idx > 0 && ps[idx-1].white && ps[idx-1].lead {
+			// No blanks follow: take the blanks before the sentence, but not a line break.
+			w := ps[idx-1]
+			s = w.s
+			for i := w.e; i > w.s; i-- {
+				if t[i-1] == '\n' {
+					s = i
+					break
+				}
 			}
 		}
 	}
-	return region{r1: row, c1: s, r2: row, c2: e}, true
+	return v.pieceRegion(starts, s, e), true
+}
+
+// pieceRegion turns the offsets s and e in the text with line breaks into a region.
+// starts has the offset of each line.
+func (v *Vim) pieceRegion(starts []int, s, e int) region {
+	at := func(o int) (int, int) {
+		r := sort.Search(len(starts), func(i int) bool { return starts[i] > o }) - 1
+		return r, o - starts[r]
+	}
+	r1, c1 := at(s)
+	r2, c2 := at(e)
+	return region{r1: r1, c1: c1, r2: r2, c2: c2}
+}
+
+// sentenceRegion changes the region of a sentence object for an operator, as vim does for an
+// exclusive motion: a region that ends at a line end ends in column 0 of the next line, and
+// then the end goes back to the end of the line before. If only blanks come before the start,
+// the region takes whole lines.
+func (v *Vim) sentenceRegion(rg region) region {
+	b := v.b
+	if rg.linewise || (rg.r1 == rg.r2 && rg.c1 == rg.c2) {
+		return rg
+	}
+	if rg.r2 < len(b.Lines)-1 && rg.c2 == len(b.Lines[rg.r2]) {
+		rg.r2, rg.c2 = rg.r2+1, 0
+	}
+	if rg.c2 == 0 && rg.r2 > rg.r1 {
+		rg.r2--
+		rg.c2 = len(b.Lines[rg.r2])
+		if strings.TrimSpace(string(b.Lines[rg.r1][:rg.c1])) == "" {
+			return region{r1: rg.r1, r2: rg.r2, linewise: true}
+		}
+	}
+	return rg
 }
 
 // blankLine reports whether line row has no text except blanks.

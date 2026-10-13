@@ -6,9 +6,9 @@
 // marks, the macros, the last change for the dot command, and the text of the : and / prompts.
 // The buffer keeps the document state.
 //
-// Known limits: marks do not move when lines are inserted or deleted (a mark that is out of
-// the text is limited to it). The dot command does not repeat a change from visual mode.
-// Sentence objects work inside one line.
+// Marks follow the lines: the buffer reports each edit that adds or removes lines, and the
+// engine moves its marks (see shiftMarks). Undo and redo do not move marks. A mark that is out
+// of the text is limited to it.
 package vim
 
 import (
@@ -49,6 +49,7 @@ type dotCmd struct {
 	reg   rune
 	count int // 0 for no count
 	body  []keymap.Key
+	vis   *visRep // set for a change that ran on a visual selection
 }
 
 // session is an insert or replace session.
@@ -69,6 +70,7 @@ type replEntry struct {
 type putReq struct {
 	before bool
 	count  int
+	vis    bool // the put replaces the visual selection
 }
 
 // Vim is the vim keymap.
@@ -183,6 +185,7 @@ func (v *Vim) fail() { v.failed = true }
 // Handle processes one key.
 func (v *Vim) Handle(b *buffer.Buffer, k keymap.Key, width, pageRows int) []keymap.Effect {
 	v.b, v.w, v.rows = b, max(1, width), max(1, pageRows)
+	b.OnShift = v.shiftMarks
 	rev := b.Rev
 	v.fx = nil
 	v.macroKeys = 0
@@ -193,6 +196,7 @@ func (v *Vim) Handle(b *buffer.Buffer, k keymap.Key, width, pageRows int) []keym
 
 // finish keeps the search matches current and adds the Changed effect.
 func (v *Vim) finish(rev int) []keymap.Effect {
+	v.b.OnShift = nil
 	if v.b.Rev != rev {
 		v.b.Refresh()
 		v.fx = append(v.fx, keymap.Changed())
@@ -262,6 +266,10 @@ func (v *Vim) abort() {
 // Reset returns to normal mode and drops the pending state. It keeps registers, marks, and
 // macros. It ends an open insert session in the buffer of the last Handle call.
 func (v *Vim) Reset() {
+	if v.b != nil {
+		v.b.OnShift = v.shiftMarks
+		defer func() { v.b.OnShift = nil }()
+	}
 	v.abort()
 	v.recReg, v.rec = 0, nil
 }
@@ -326,6 +334,7 @@ func (v *Vim) fixCursor() {
 // Paste inserts text that comes from the terminal or from the system clipboard.
 func (v *Vim) Paste(b *buffer.Buffer, text string) []keymap.Effect {
 	v.b = b
+	b.OnShift = v.shiftMarks
 	rev := b.Rev
 	v.fx = nil
 	b.Clamp()
@@ -344,8 +353,9 @@ func (v *Vim) Paste(b *buffer.Buffer, text string) []keymap.Effect {
 		if v.putReq != nil {
 			before, count = v.putReq.before, v.putReq.count
 		}
+		repl := v.putReq != nil && v.putReq.vis && v.visual()
 		v.putReq = nil
-		if v.visual() {
+		if v.visual() && !repl {
 			v.exitVisual()
 		}
 		r := regval{text: text}
@@ -353,7 +363,12 @@ func (v *Vim) Paste(b *buffer.Buffer, text string) []keymap.Effect {
 			r = regval{text: strings.TrimSuffix(text, "\n"), linewise: true}
 		}
 		b.BeginChange()
-		v.put(r, before, count)
+		if repl { // here before is true for P: the replaced text stays out of the registers
+			v.replaceSelection(r, before, count)
+			v.change = false
+		} else {
+			v.put(r, before, count)
+		}
 		b.EndChange()
 		v.fixCursor()
 	}

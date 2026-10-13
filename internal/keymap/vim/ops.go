@@ -49,6 +49,12 @@ func (v *Vim) exec(c cmd) {
 	case c.op != "" && c.name == "" && !c.dbl && v.visual():
 		v.visualOp(c)
 		return
+	case v.visual() && (c.name == "p" || c.name == "P"):
+		v.visualPut(c)
+		return
+	case v.visual() && c.name == "r":
+		v.visualReplace(c)
+		return
 	case c.op != "":
 		v.operator(c)
 		return
@@ -188,11 +194,15 @@ func (v *Vim) join(c cmd, n int) {
 	b := v.b
 	if v.visual() {
 		r1, r2 := min(b.SelRow, b.Row), max(b.SelRow, b.Row)
+		rep := v.visInfo(true)
 		v.exitVisual()
 		b.Row = r1
 		if !b.JoinLines(max(2, r2-r1+1), c.name == "J") {
 			v.fail()
+			return
 		}
+		v.change = true
+		v.setVisRep(rep)
 		return
 	}
 	if !b.JoinLines(max(2, n), c.name == "J") {
@@ -281,6 +291,9 @@ func (v *Vim) operator(c cmd) {
 		if rg, ok = v.object(c.name, n); !ok {
 			v.fail()
 			return
+		}
+		if c.name[1] == 's' {
+			rg = v.sentenceRegion(rg)
 		}
 	default:
 		var m mres
@@ -528,10 +541,8 @@ func (v *Vim) selectObject(c cmd, n int) {
 func (v *Vim) visualOp(c cmd) {
 	b := v.b
 	linewise := b.SelLinewise || c.vline
-	a, e := pos{b.SelRow, b.SelCol}, pos{b.Row, b.Col}
-	if e.row < a.row || (e.row == a.row && e.col < a.col) {
-		a, e = e, a
-	}
+	a, e := v.selEnds()
+	rep := v.visInfo(linewise)
 	r1, c1, r2, c2, ok := b.SelRange()
 	v.exitVisual()
 	if !ok && !linewise {
@@ -543,7 +554,9 @@ func (v *Vim) visualOp(c cmd) {
 	}
 	b.Row, b.Col = a.row, a.col
 	v.apply(c, rg, c.count())
-	v.change = false // the dot command does not repeat a visual change
+	if v.change {
+		v.setVisRep(rep)
+	}
 }
 
 // ---- registers ----
@@ -682,11 +695,17 @@ func (v *Vim) repeatDot(c cmd) {
 		}
 	}
 	keys = append(keys, d.body...)
+	if d.vis != nil {
+		v.startVisRep(d.vis)
+	}
 	v.inDot++
 	for _, k := range keys {
 		v.feed(k)
 	}
 	v.inDot--
+	if d.vis != nil && v.visual() {
+		v.exitVisual()
+	}
 }
 
 // key makes a typed key.

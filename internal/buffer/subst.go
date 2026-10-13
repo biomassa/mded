@@ -292,6 +292,7 @@ func (j *SubJob) Replace() {
 		tail := []rune(parts[k])
 		rows = append(rows, splice(tail, len(tail), len(tail), line[z:]))
 		b.Lines = append(b.Lines[:row], append(rows, b.Lines[row+1:]...)...)
+		b.shift(Shift{At: row + 1, N: k})
 		j.rowOff += k
 		j.next += k
 		j.end += k

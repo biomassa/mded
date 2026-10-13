@@ -167,6 +167,12 @@ func (p *parser) command(s string, vis bool) int {
 				return p.withArg()
 			}
 			return stDone
+		case "p", "P":
+			c.name = s
+			return stDone
+		case "r":
+			c.name = s
+			return p.withArg()
 		case "i", "a":
 			return p.object(s)
 		}

@@ -45,6 +45,7 @@ func (b *Buffer) SplitLine() {
 	head, tail := splice(l, b.Col, len(l), nil), splice(l, 0, b.Col, nil)
 	b.Lines[b.Row] = head
 	b.Lines = append(b.Lines[:b.Row+1], append([][]rune{tail}, b.Lines[b.Row+1:]...)...)
+	b.shift(Shift{At: b.Row + 1, N: 1})
 	b.Row++
 	b.Col, b.Want = 0, -1
 	b.touch()
@@ -121,6 +122,7 @@ func (b *Buffer) Backspace() {
 		b.Col = len(prev)
 		b.Lines[b.Row-1] = splice(prev, len(prev), len(prev), b.Lines[b.Row])
 		b.Lines = append(b.Lines[:b.Row], b.Lines[b.Row+1:]...)
+		b.shift(Shift{At: b.Row, N: -1, Join: true, Col: b.Col})
 		b.Row--
 		b.touch()
 	}
@@ -140,6 +142,7 @@ func (b *Buffer) DeleteForward() {
 	if b.Row < len(b.Lines)-1 {
 		b.Lines[b.Row] = splice(l, len(l), len(l), b.Lines[b.Row+1])
 		b.Lines = append(b.Lines[:b.Row+1], b.Lines[b.Row+2:]...)
+		b.shift(Shift{At: b.Row + 1, N: -1, Join: true, Col: len(l)})
 		b.touch()
 	}
 }
