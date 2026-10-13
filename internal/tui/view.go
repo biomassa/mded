@@ -376,7 +376,7 @@ func (m *Model) docCursor() *tea.Cursor {
 		cx = ansi.StringWidth(sb.String())
 	}
 	dr := m.docRect()
-	x := dr.x + 2 + 1 + cx // the pane border, the margin, and the cells before the cursor
+	x := dr.x + 2 + cx // the pane border, the row margin, and the cells before the cursor
 	y := 1 + m.textTop() + cy - d.off
 	return newCursor(min(x, dr.x+dr.w-2), y, m.docCursorShape())
 }

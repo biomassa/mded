@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/biomassa/mded/internal/keymap"
 )
@@ -30,22 +31,39 @@ func TestCursorConventionalEdit(t *testing.T) {
 		t.Fatal("no cursor in edit mode")
 	}
 	dr := m.docRect()
-	if c.X != dr.x+3 || c.Y != 1 || c.Shape != tea.CursorUnderline || !c.Blink || c.Color == nil {
-		t.Errorf("cursor %+v, want x %d y 1 underline", c, dr.x+3)
+	if c.X != dr.x+2 || c.Y != 1 || c.Shape != tea.CursorUnderline || !c.Blink || c.Color == nil {
+		t.Errorf("cursor %+v, want x %d y 1 underline", c, dr.x+2)
 	}
 	press(m, "down", "right", "right") // after two wide runes: 4 cells
 	c = m.View().Cursor
-	if c == nil || c.X != dr.x+3+4 || c.Y != 2 {
-		t.Errorf("wide runes: cursor %+v, want x %d y 2", c, dr.x+7)
+	if c == nil || c.X != dr.x+2+4 || c.Y != 2 {
+		t.Errorf("wide runes: cursor %+v, want x %d y 2", c, dr.x+6)
 	}
 	press(m, "end") // after the last rune
 	c = m.View().Cursor
-	if c == nil || c.X != dr.x+3+5 {
-		t.Errorf("line end: cursor %+v, want x %d", c, dr.x+8)
+	if c == nil || c.X != dr.x+2+5 {
+		t.Errorf("line end: cursor %+v, want x %d", c, dr.x+7)
 	}
 	press(m, "esc")
 	if m.View().Cursor != nil {
 		t.Error("back in view mode: the cursor must be hidden")
+	}
+}
+
+// The cell under the cursor on the drawn screen is the rune at the cursor, also in the first
+// column of a line.
+func TestCursorOnScreenRune(t *testing.T) {
+	p := writeTemp(t, "a.md", "abc\nxyz\n", 0o644)
+	m := testModelSize(t, p, 40, 10)
+	press(m, "e", "down", "home")
+	c := m.View().Cursor
+	if c == nil {
+		t.Fatal("no cursor")
+	}
+	lines := strings.Split(ansi.Strip(m.View().Content), "\n")
+	got := []rune(lines[c.Y])
+	if c.X >= len(got) || got[c.X] != 'x' {
+		t.Errorf("cell under the cursor (%d,%d) in %q is not 'x'", c.X, c.Y, lines[c.Y])
 	}
 }
 
@@ -73,7 +91,7 @@ func TestCursorWrappedLineAndScroll(t *testing.T) {
 		t.Fatal("the line did not wrap")
 	}
 	dr := m.docRect()
-	want := dr.x + 3 + len(last.Cells)
+	want := dr.x + 2 + len(last.Cells)
 	if c.X != want || c.Y != 1+cy-m.doc.off {
 		t.Errorf("cursor %d,%d want %d,%d", c.X, c.Y, want, 1+cy-m.doc.off)
 	}
@@ -156,4 +174,27 @@ func TestCursorHiddenInDialogAndPopups(t *testing.T) {
 	if m.help != nil && m.View().Cursor != nil {
 		t.Error("help must hide the cursor")
 	}
+}
+
+// In the search prompt and in the find box, the cursor is just after the typed text.
+func TestPromptCursorOnScreen(t *testing.T) {
+	p := writeTemp(t, "a.md", "abc\n", 0o644)
+	m := testModelSize(t, p, 40, 10)
+	after := func(name string, want rune) {
+		t.Helper()
+		c := m.View().Cursor
+		if c == nil {
+			t.Fatalf("%s: no cursor", name)
+		}
+		line := []rune(strings.Split(ansi.Strip(m.View().Content), "\n")[c.Y])
+		if c.X < 1 || c.X > len(line) || line[c.X-1] != want {
+			t.Errorf("%s: cell before the cursor (%d,%d) in %q is not %q", name, c.X, c.Y, string(line), want)
+		}
+	}
+	press(m, "/")
+	typeText(m, "bq")
+	after("search prompt", 'q')
+	press(m, "esc", "e", "ctrl+f")
+	typeText(m, "bz")
+	after("find box", 'z')
 }
