@@ -14,10 +14,88 @@ mded is a markdown viewer and editor for the terminal.
 - **Sidebar** with a directory tree, a filter, and file operations.
 - **Color themes**, with a theme picker.
 
-## Install
+## Installation
+
+### Install Go
+
+If you do not have Go, install it with the package manager of your system.
+
+macOS ([Homebrew](https://brew.sh)):
 
 ```sh
-go install github.com/biomassa/mded/cmd/mded@latest
+brew install go
+```
+
+Debian and Ubuntu:
+
+```sh
+sudo apt install golang-go
+```
+
+Fedora, RHEL, and CentOS Stream:
+
+```sh
+sudo dnf install golang
+```
+
+Arch Linux and Manjaro:
+
+```sh
+sudo pacman -S go
+```
+
+openSUSE:
+
+```sh
+sudo zypper install go
+```
+
+Any Linux, with the official archive from [go.dev](https://go.dev/dl/) (use `arm64` in place of `amd64` on ARM):
+
+```sh
+curl -LO https://go.dev/dl/go1.27.1.linux-amd64.tar.gz
+sudo rm -rf /usr/local/go
+sudo tar -C /usr/local -xzf go1.27.1.linux-amd64.tar.gz
+echo 'export PATH="$PATH:/usr/local/go/bin"' >> ~/.profile
+```
+
+Examine the version with `go version`. Some distributions have a Go version that is older than 1.27. Go 1.21 or later can download the necessary version itself. If `go install` fails because the version is too old, add `GOTOOLCHAIN=go1.27.1` before the command:
+
+```sh
+GOTOOLCHAIN=go1.27.1 go install -trimpath -ldflags="-s -w" github.com/biomassa/mded/cmd/mded@latest
+```
+
+### Install mded
+
+Each [release](https://github.com/biomassa/mded/releases) has binaries for Linux and macOS (amd64 and arm64). You do not need Go for them. Download the archive for your system, then extract `mded` to a directory in your `PATH`:
+
+```sh
+tar -xzf mded_0.1.0_linux_amd64.tar.gz
+install mded_0.1.0_linux_amd64/mded ~/.local/bin/
+```
+
+On macOS, a downloaded binary can get a quarantine flag. If macOS refuses to start it, remove the flag with `xattr -d com.apple.quarantine ~/.local/bin/mded`.
+
+Or install the latest release with Go:
+
+```sh
+go install -trimpath -ldflags="-s -w" github.com/biomassa/mded/cmd/mded@latest
+```
+
+The flags remove the debug data, as in the release binaries. The program is then smaller, and it works the same.
+
+Go puts the binary in `$(go env GOPATH)/bin`, usually `~/go/bin`. Make sure that this directory is in your `PATH`:
+
+```sh
+echo 'export PATH="$PATH:$(go env GOPATH)/bin"' >> ~/.profile
+```
+
+To build from the source:
+
+```sh
+git clone https://github.com/biomassa/mded.git
+cd mded
+go build -trimpath -ldflags="-s -w" -o mded ./cmd/mded
 ```
 
 ## Start
@@ -198,6 +276,10 @@ The config file is `~/.config/mded/config.toml`. All keys are optional.
 - In view mode, a click on a checkbox changes it, and a click on a link follows it. A double-click edits the line. A double-click on a checkbox does not change it.
 - In edit mode, a click puts the cursor, and a drag selects text. In vim mode, a drag starts visual mode.
 - In the sidebar, a click selects and a double-click opens.
+
+## Versions
+
+mded uses [Semantic Versioning](https://semver.org). Before version 1.0.0, a minor version (0.2.0) can change keys, commands, and file formats. [CHANGELOG.md](CHANGELOG.md) lists the changes of each version. `mded --version` shows the version.
 
 ## Credits
 
