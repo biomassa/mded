@@ -101,7 +101,8 @@ A link to a file opens the file in mded. A link with `#heading` goes to that hea
 | `ctrl+a` | Select all. |
 | `ctrl+c`, `ctrl+x`, `ctrl+v` | Copy, cut, and paste with the system clipboard. |
 | `ctrl+z`, `ctrl+y` | Undo, redo. |
-| `ctrl+b`, `ctrl+i`, `ctrl+k`, `ctrl+t` | Bold, italic, link, checkbox. |
+| `ctrl+b`, `ctrl+i`, `ctrl+l`, `ctrl+t` | Bold, italic, link, checkbox. |
+| `ctrl+k` | Delete the line. With a selection, delete all the lines of the selection. |
 | `tab` | Insert spaces (`tab_width`). |
 | `enter` | Start a new line. On a list item, start the next item. On an empty item, end the list. |
 | `ctrl+f` | Find and replace. |

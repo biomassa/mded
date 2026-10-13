@@ -208,8 +208,18 @@ func (c *Conv) handle(b *buffer.Buffer, k keymap.Key, w, pageRows int) []keymap.
 		c.wrap(b, "**", "**")
 	case "ctrl+i":
 		c.wrap(b, "*", "*")
-	case "ctrl+k":
+	case "ctrl+l":
 		c.wrap(b, "[", "]()")
+	case "ctrl+k": // delete the line, or all lines of the selection
+		r1, r2 := b.Row, b.Row
+		if s1, _, s2, _, ok := b.SelRange(); ok {
+			r1, r2 = s1, s2
+		}
+		col := b.Col
+		b.ClearSel()
+		b.PushUndo(false)
+		b.DeleteLines(r1, r2)
+		b.MoveTo(b.Row, col)
 	case "ctrl+t":
 		b.ClearSel()
 		b.PushUndo(false)
