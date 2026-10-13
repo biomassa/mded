@@ -201,7 +201,7 @@ func applyPalette(p palette) {
 	Link = Readable(p.focus, p.bg, 3)
 	Code = Purple
 	// All heading levels use the accent. HeadingStyle makes the bar fainter for each level.
-	headingHexes = [6]string{Link, Link, Link, Link, Link, Link}
+	headingHexes = distinctHues([6]string{Link, Good, Error, Warn, Purple, Mix(Link, Good, 0.5)}, p.bg)
 	chromaStyle = chromaStyles[p.name]
 }
 
@@ -292,27 +292,108 @@ func Label(name string) string {
 }
 
 // headingHex is the color of a heading level. The default theme has red, yellow, green,
-// blue, orange, and purple. A palette theme uses its accent for all levels.
+// blue, orange, and purple. A palette theme uses its accent, green, red, orange, purple, and
+// a mix of the accent and the green (see distinctHues).
 func headingHex(level int) string { return headingHexes[max(1, min(level, 6))-1] }
 
-// headingShades is how far the bar of each level goes toward the background in a palette
-// theme: level 1 is the strongest.
-var headingShades = [6]float64{0.45, 0.58, 0.68, 0.76, 0.82, 0.87}
+// minHueGap is the smallest hue difference, in degrees, between two heading levels.
+const minHueGap = 30
 
-// HeadingColors returns the text and the bar color of a heading level.
+// distinctHues makes the heading colors of a palette different from each other. Some
+// palettes use one color for two roles, for example the accent and the error color. A color
+// whose hue is near the hue of an earlier level turns on the color wheel until it is far
+// enough from all earlier levels. A gray color gets the saturation of the accent first.
+// The result stays readable on bg.
+func distinctHues(in [6]string, bg string) [6]string {
+	var out [6]string
+	_, accentSat, _ := toHSL(in[0])
+	for i, h := range in {
+		hue, sat, light := toHSL(h)
+		if sat < 0.25 {
+			sat = max(accentSat, 0.5)
+		}
+		for turn := 0; turn < 12 && !hueFree(hue, out[:i]); turn++ {
+			hue = math.Mod(hue+minHueGap+7, 360)
+		}
+		out[i] = Readable(fromHSL(hue, sat, light), bg, 3)
+	}
+	return out
+}
+
+// hueFree reports whether hue is at least minHueGap degrees from the hue of each color.
+func hueFree(hue float64, colors []string) bool {
+	for _, c := range colors {
+		h, _, _ := toHSL(c)
+		d := math.Abs(h - hue)
+		if math.Min(d, 360-d) < minHueGap {
+			return false
+		}
+	}
+	return true
+}
+
+// toHSL converts "#RRGGBB" to hue (0 to 360), saturation, and lightness (0 to 1).
+func toHSL(hex string) (h, s, l float64) {
+	r, g, b := parseHex(hex)
+	r, g, b = r/255, g/255, b/255
+	hi, lo := math.Max(r, math.Max(g, b)), math.Min(r, math.Min(g, b))
+	l = (hi + lo) / 2
+	if hi == lo {
+		return 0, 0, l
+	}
+	d := hi - lo
+	if l > 0.5 {
+		s = d / (2 - hi - lo)
+	} else {
+		s = d / (hi + lo)
+	}
+	switch hi {
+	case r:
+		h = math.Mod((g-b)/d+6, 6)
+	case g:
+		h = (b-r)/d + 2
+	default:
+		h = (r-g)/d + 4
+	}
+	return h * 60, s, l
+}
+
+// fromHSL converts hue, saturation, and lightness to "#RRGGBB".
+func fromHSL(h, s, l float64) string {
+	c := (1 - math.Abs(2*l-1)) * s
+	x := c * (1 - math.Abs(math.Mod(h/60, 2)-1))
+	m := l - c/2
+	var r, g, b float64
+	switch {
+	case h < 60:
+		r, g, b = c, x, 0
+	case h < 120:
+		r, g, b = x, c, 0
+	case h < 180:
+		r, g, b = 0, c, x
+	case h < 240:
+		r, g, b = 0, x, c
+	case h < 300:
+		r, g, b = x, 0, c
+	default:
+		r, g, b = c, 0, x
+	}
+	v := func(f float64) int { return int(math.Round((f + m) * 255)) }
+	return fmt.Sprintf("#%02X%02X%02X", v(r), v(g), v(b))
+}
+
+// HeadingColors returns the text and the bar color of a heading level. All levels have one
+// bar strength: the hue tells the levels apart.
 func HeadingColors(level int) (text, bar string) {
 	h := headingHex(level)
-	shade := 0.62 // the default theme: one strength, a color for each level
-	if themeBg != "" {
-		shade = headingShades[max(1, min(level, 6))-1]
-	}
+	shade := 0.62
 	text = Mix(h, "#FFFFFF", 0.55)
 	if !darkTheme {
 		text = Mix(h, "#000000", 0.45)
 	}
 	bar = Mix(h, BaseBg, shade)
 	for ; shade < 0.95 && Contrast(Readable(text, bar, 4.5), bar) < 4.5; shade += 0.03 {
-		bar = Mix(h, BaseBg, shade) // a bright accent: a fainter bar, so that the text stays readable
+		bar = Mix(h, BaseBg, shade) // a bright color: a fainter bar, so that the text stays readable
 	}
 	return Readable(text, bar, 4.5), bar
 }

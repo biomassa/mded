@@ -23,7 +23,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - The edit cursor is the cursor of the terminal: a blinking underscore, and a blinking block in vim normal mode.
 - A sidebar with a directory tree and a filter. It can create, rename, and delete files and directories. `ctrl+e` moves the focus between the sidebar and the document.
 - Start with a file (`mded FILE`), a directory (`mded DIR`), or the current directory (`mded`).
-- Color themes from godoist, with a theme picker (`T`).
+- Color themes from godoist, with a theme picker (`T`). Each heading level has its own color in all themes.
 - A config file: `~/.config/mded/config.toml`.
 
 [Unreleased]: https://github.com/biomassa/mded/compare/v0.1.0...HEAD
