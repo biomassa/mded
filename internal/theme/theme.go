@@ -289,37 +289,53 @@ func Label(name string) string {
 	return name
 }
 
-// headingShades is how far the bar of each level goes from the accent toward the
-// background: level 1 is the strongest. The steps are large, so that the levels are easy to
-// tell apart.
-var headingShades = [6]float64{0.25, 0.42, 0.56, 0.68, 0.78, 0.87}
+// headingShades is how far the bar of each level goes from the level 1 bar toward the
+// background. The steps are large, so that the levels are easy to tell apart.
+var headingShades = [6]float64{0, 0.3, 0.5, 0.65, 0.78, 0.87}
 
 // headingAccent is the color of the heading bars: the accent of the theme, readable on the
 // background.
 func headingAccent() string { return Readable(Accent, BaseBg, 3) }
 
+// headingLight is the bright text of levels 1 and 2: near white on a dark theme, near black
+// on a light theme, with a tint of the accent.
+func headingLight() string {
+	if darkTheme {
+		return Mix(headingAccent(), "#FFFFFF", 0.85)
+	}
+	return Mix(headingAccent(), "#000000", 0.6)
+}
+
+// headingTop is the bar of level 1: the accent, made deeper (toward black on a dark theme,
+// toward white on a light theme) until the bright text is readable on it.
+func headingTop() string {
+	to := "#000000"
+	if !darkTheme {
+		to = "#FFFFFF"
+	}
+	h, text := headingAccent(), headingLight()
+	bar := h
+	for t := 0.05; t <= 0.9 && Contrast(text, bar) < 4.5; t += 0.05 {
+		bar = Mix(h, to, t)
+	}
+	return bar
+}
+
 // HeadingColors returns the text and the bar color of a heading level. All levels use the
-// accent. A lower level has a fainter bar. The text is bright for levels 1 and 2, the text
-// color for levels 3 and 4, and the muted color for levels 5 and 6.
+// accent. Level 1 has the strongest bar, and each lower level goes further toward the
+// background. The text is bright for levels 1 and 2, the text color for levels 3 and 4, and
+// the muted color for levels 5 and 6.
 func HeadingColors(level int) (text, bar string) {
 	lv := max(1, min(level, 6))
-	h := headingAccent()
-	shade := headingShades[lv-1]
 	switch {
 	case lv <= 2:
-		text = Mix(h, "#FFFFFF", 0.7)
-		if !darkTheme {
-			text = Mix(h, "#000000", 0.6)
-		}
+		text = headingLight()
 	case lv <= 4:
 		text = Text
 	default:
 		text = Muted
 	}
-	bar = Mix(h, BaseBg, shade)
-	for ; shade < 0.95 && Contrast(Readable(text, bar, 4.5), bar) < 4.5; shade += 0.03 {
-		bar = Mix(h, BaseBg, shade) // a bright accent: a fainter bar, so that the text stays readable
-	}
+	bar = Mix(headingTop(), BaseBg, headingShades[lv-1])
 	return Readable(text, bar, 4.5), bar
 }
 

@@ -7,6 +7,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+
+- The level 1 heading has a deeper bar with near-white text on a dark theme. Before, its text was black. All lower levels start from this bar and go toward the background in larger steps.
+
 ### Fixed
 
 - Inline markdown in bold, italic, strikethrough, and link text shows formatted. Before, code in bold text showed its backticks.
