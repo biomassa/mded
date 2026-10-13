@@ -9,7 +9,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
-- The level 1 heading has a deeper bar with near-white text on a dark theme. Before, its text was black. All lower levels start from this bar and go toward the background in larger steps.
+- The level 1 heading has a deeper bar with near-white text on a dark theme. Before, its text was black.
+- The heading levels are easy to tell apart in all themes. Levels 1 and 2 have a bar to the full width, and levels 3 and 4 a short bar. The bar colors go from level 1 to the background in equal steps of perceived color difference. Levels 5 and 6 have no bar: level 5 has bold accent text, and level 6 plain accent text.
 
 ### Fixed
 

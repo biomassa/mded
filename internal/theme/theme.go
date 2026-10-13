@@ -199,7 +199,7 @@ func applyPalette(p palette) {
 	Purple = Readable(Mix(p.errorHex, p.focus, 0.6), p.bg, 3)
 	Link = Readable(p.focus, p.bg, 3)
 	Code = Purple
-	// All heading levels use the accent. HeadingStyle makes the bar fainter for each level.
+	// All heading levels use the accent (see HeadingColors).
 	chromaStyle = chromaStyles[p.name]
 }
 
@@ -289,10 +289,6 @@ func Label(name string) string {
 	return name
 }
 
-// headingShades is how far the bar of each level goes from the level 1 bar toward the
-// background. The steps are large, so that the levels are easy to tell apart.
-var headingShades = [6]float64{0, 0.3, 0.5, 0.65, 0.78, 0.87}
-
 // headingAccent is the color of the heading bars: the accent of the theme, readable on the
 // background.
 func headingAccent() string { return Readable(Accent, BaseBg, 3) }
@@ -321,35 +317,115 @@ func headingTop() string {
 	return bar
 }
 
-// HeadingColors returns the text and the bar color of a heading level. All levels use the
-// accent. Level 1 has the strongest bar, and each lower level goes further toward the
-// background. The text is bright for levels 1 and 2, the text color for levels 3 and 4, and
-// the muted color for levels 5 and 6.
+// headingBarLevels is the number of levels with a bar. Levels 5 and 6 have accent text and
+// no bar.
+const headingBarLevels = 4
+
+// headingBar returns the bar of a level from 1 to 4. The bars go from the level 1 bar to the
+// background in equal steps of perceived color difference (CIE Lab), so that each step is
+// as large as the theme permits: there are 4 steps from level 1 to the background.
+func headingBar(lv int) string {
+	top := headingTop()
+	if lv <= 1 {
+		return top
+	}
+	want := float64(lv-1) / headingBarLevels * deltaE(top, BaseBg)
+	lo, hi := 0.0, 1.0 // the share of the background in the mix
+	for range 30 {
+		mid := (lo + hi) / 2
+		if deltaE(top, Mix(top, BaseBg, mid)) < want {
+			lo = mid
+		} else {
+			hi = mid
+		}
+	}
+	return Mix(top, BaseBg, (lo+hi)/2)
+}
+
+// HeadingFill returns how far the bar of a heading level goes: -1 for the full width
+// (levels 1 and 2), the number of bar cells after the text (levels 3 and 4), or 0 for no
+// bar (levels 5 and 6). The length of the bar shows the level in all themes.
+func HeadingFill(level int) int {
+	switch lv := max(1, min(level, 6)); {
+	case lv <= 2:
+		return -1
+	case lv <= headingBarLevels:
+		return 2
+	}
+	return 0
+}
+
+// HeadingColors returns the text and the bar color of a heading level. Levels 1 to 4 have a
+// bar in the accent: level 1 is the strongest, and each lower level goes toward the
+// background. The text is bright for levels 1 and 2 and the text color for levels 3 and 4.
+// Levels 5 and 6 have no bar (bar is the background) and accent text.
 func HeadingColors(level int) (text, bar string) {
 	lv := max(1, min(level, 6))
 	switch {
 	case lv <= 2:
 		text = headingLight()
-	case lv <= 4:
+	case lv <= headingBarLevels:
 		text = Text
 	default:
-		text = Muted
+		return Readable(headingAccent(), BaseBg, 4.5), BaseBg
 	}
-	bar = Mix(headingTop(), BaseBg, headingShades[lv-1])
+	bar = headingBar(lv)
 	return Readable(text, bar, 4.5), bar
 }
 
-// HeadingStyle is the bar style of a heading level: a tinted background, with bold text for
-// levels 1 to 4.
+// HeadingStyle is the style of a heading level: a bar with bold text for levels 1 to 4,
+// bold accent text for level 5, and plain accent text for level 6.
 func HeadingStyle(level int) lipgloss.Style {
 	text, bar := HeadingColors(level)
-	return lipgloss.NewStyle().Background(C(bar)).Foreground(C(text)).Bold(level <= 4)
+	st := lipgloss.NewStyle().Foreground(C(text)).Bold(level <= 5)
+	if HeadingFill(level) != 0 {
+		st = st.Background(C(bar))
+	}
+	return st
 }
 
-// HeadingBar draws a heading as a full-width bar.
+// HeadingBar draws a heading as a bar of width w: to the full width for levels 1 and 2, a
+// short bar for levels 3 and 4, and text with no bar for levels 5 and 6.
 func HeadingBar(level int, text string, w int) string {
 	t := ansi.Truncate(text, max(1, w-3), "…")
-	return HeadingStyle(level).Render(" " + t + strings.Repeat(" ", max(0, w-2-lipgloss.Width(t))))
+	pad := 0
+	switch f := HeadingFill(level); {
+	case f < 0:
+		pad = max(0, w-2-lipgloss.Width(t))
+	case f > 0:
+		pad = min(f, max(0, w-2-lipgloss.Width(t)))
+	}
+	return HeadingStyle(level).Render(" " + t + strings.Repeat(" ", pad))
+}
+
+// deltaE is the perceived difference of two colors: the distance in CIE Lab (CIE76).
+func deltaE(a, b string) float64 {
+	l1, a1, b1 := toLab(a)
+	l2, a2, b2 := toLab(b)
+	return math.Sqrt((l1-l2)*(l1-l2) + (a1-a2)*(a1-a2) + (b1-b2)*(b1-b2))
+}
+
+// toLab converts "#RRGGBB" (sRGB, D65 white) to CIE Lab.
+func toLab(hex string) (l, a, b float64) {
+	r, g, bl := parseHex(hex)
+	lin := func(v float64) float64 {
+		v /= 255
+		if v <= 0.04045 {
+			return v / 12.92
+		}
+		return math.Pow((v+0.055)/1.055, 2.4)
+	}
+	R, G, B := lin(r), lin(g), lin(bl)
+	x := (0.4124*R + 0.3576*G + 0.1805*B) / 0.95047
+	y := 0.2126*R + 0.7152*G + 0.0722*B
+	z := (0.0193*R + 0.1192*G + 0.9505*B) / 1.08883
+	f := func(t float64) float64 {
+		if t > 0.008856 {
+			return math.Cbrt(t)
+		}
+		return 7.787*t + 16.0/116
+	}
+	return 116*f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))
 }
 
 // ReaderStyle is the Glamour dark or light style with clean headings (no "##" marks) and

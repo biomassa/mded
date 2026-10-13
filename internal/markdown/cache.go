@@ -216,8 +216,12 @@ func RenderRow(r Row, tw, cx int) string {
 	if cx >= len(r.Cells) && cx >= 0 { // the cursor after the last rune
 		b.WriteString(lipgloss.NewStyle().Reverse(true).Render(" "))
 	}
-	if r.Fill > 0 { // fill the bar to the full width
-		if n := tw - r.Indent() - lipgloss.Width(b.String()); n > 0 {
+	if r.Fill > 0 { // the bar after the text: to the full width, a short bar, or none
+		n := tw - r.Indent() - lipgloss.Width(b.String())
+		if f := theme.HeadingFill(r.Fill); f >= 0 {
+			n = min(n, f)
+		}
+		if n > 0 {
 			b.WriteString(theme.HeadingStyle(r.Fill).Render(strings.Repeat(" ", n)))
 		}
 	}
