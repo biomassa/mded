@@ -254,7 +254,7 @@ Drag the border between the sidebar and the document to change the width. mded s
 
 `T` in view mode opens the theme picker. A move shows the theme. `enter` keeps it and saves it in the config file. `esc` goes back to the theme in use.
 
-The themes are: default, catppuccin-mocha, catppuccin-latte, catppuccin-frappe, catppuccin-macchiato, nord, dracula, gruvbox-dark, gruvbox-light, tokyo-night, tokyo-night-day, rose-pine, rose-pine-moon, rose-pine-dawn, one-dark, magenta-geode, coral-sunset, lavender-fields-forever, vt100, and vt52. The `default` theme uses the colors of your terminal. Each heading level has its own color in all themes. A palette theme takes the colors of its levels from its own palette.
+The themes are: default, catppuccin-mocha, catppuccin-latte, catppuccin-frappe, catppuccin-macchiato, nord, dracula, gruvbox-dark, gruvbox-light, tokyo-night, tokyo-night-day, rose-pine, rose-pine-moon, rose-pine-dawn, one-dark, magenta-geode, coral-sunset, lavender-fields-forever, vt100, and vt52. The `default` theme uses the colors of your terminal. The heading bars use the accent of the theme. Each lower level has a fainter bar. Levels 1 and 2 have bright bold text, levels 3 and 4 bold text, and levels 5 and 6 muted text.
 
 ## Config
 
