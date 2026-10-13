@@ -262,10 +262,11 @@ func TestLayoutSourceWrapAndDecorate(t *testing.T) {
 		AsSource: func(int) bool { return true },
 		Decorate: func(line, col int, st lipgloss.Style) lipgloss.Style { n++; return st },
 	})
-	if len(rows) != 2 || rows[1].Start != 10 || n != 19 {
+	// Width 10 less one cell of indent: a row has at most 9 runes.
+	if len(rows) != 3 || rows[1].Start != 5 || n != 19 {
 		t.Errorf("rows %d start %d n %d", len(rows), rows[1].Start, n)
 	}
-	if CursorRow(rows, 0, 12) != 1 || CursorRow(rows, 0, 3) != 0 {
+	if CursorRow(rows, 0, 7) != 1 || CursorRow(rows, 0, 3) != 0 {
 		t.Error("CursorRow wrapped")
 	}
 }
@@ -335,12 +336,12 @@ func TestRenderRow(t *testing.T) {
 		t.Error("image row")
 	}
 	r := Row{Cells: []Cell{{R: 'a'}, {R: 'b'}}, Source: true}
-	if got := ansi.Strip(RenderRow(r, 10, 2)); got != " ab " {
+	if got := ansi.Strip(RenderRow(r, 10, 2)); got != "  ab " {
 		t.Errorf("got %q", got)
 	}
 	cells, lv := PreviewCells("# Hi")
 	got := ansi.Strip(RenderRow(Row{Cells: cells, Fill: lv}, 10, -1))
-	if len([]rune(got)) != 11 {
+	if len([]rune(got)) != 11 || !strings.HasPrefix(got, "  Hi") {
 		t.Errorf("bar width %d: %q", len([]rune(got)), got)
 	}
 }
@@ -351,7 +352,7 @@ func TestRender(t *testing.T) {
 	if len(out) < 3 || !strings.Contains(ansi.Strip(out[0]), "H") {
 		t.Errorf("out = %q", out)
 	}
-	if got := c.PreviewRows("---", 5); len(got) != 1 || !strings.Contains(ansi.Strip(got[0].Pre), "─────") {
+	if got := c.PreviewRows("---", 5); len(got) != 1 || ansi.Strip(got[0].Pre) != "  ────" {
 		t.Errorf("rule = %+v", got)
 	}
 }
@@ -362,7 +363,7 @@ func TestTable(t *testing.T) {
 	rows := c.Layout(doc, LayoutOpts{Width: 60})
 	var got []string
 	for _, r := range rows {
-		got = append(got, ansi.Strip(RenderRow(Row{Cells: r.Cells}, 60, -1)))
+		got = append(got, ansi.Strip(RenderRow(Row{Cells: r.Cells}, 60, -1))[1:]) // without the margin
 	}
 	if len(got) != 4 {
 		t.Fatalf("rows = %q", got)

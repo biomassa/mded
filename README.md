@@ -274,6 +274,7 @@ The config file is `~/.config/mded/config.toml`. All keys are optional.
 
 - The wheel scrolls the pane under the mouse.
 - In view mode, a click on a checkbox changes it, and a click on a link follows it. A double-click edits the line. A double-click on a checkbox does not change it.
+- In view mode, a drag selects text, and mded copies it to the system clipboard when you release the button. The copy is the markdown source of the selected text: `**`, `- `, and other marks are in it when the selection includes them. A code block row gives its full source line.
 - In edit mode, a click puts the cursor, and a drag selects text. In vim mode, a drag starts visual mode.
 - In the sidebar, a click selects and a double-click opens.
 

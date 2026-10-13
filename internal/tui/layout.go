@@ -40,6 +40,9 @@ func (m *Model) docRect() rect {
 // each side.
 func (m *Model) textW() int { return max(1, m.docRect().w-4) }
 
+// bodyW is the text width of a row that is not a heading bar: textW less the indent.
+func (m *Model) bodyW() int { return markdown.BodyWidth(m.textW()) }
+
 // textTop is the number of pane lines above the text: the lines of the find box.
 func (m *Model) textTop() int { return len(m.findLn) }
 
@@ -71,6 +74,7 @@ type layoutKey struct {
 	themeGen, imgGen      int
 	plain                 bool
 	focus                 focusPane
+	vsel                  viewSel
 }
 
 func (m *Model) layoutKey(tw, th int) layoutKey {
@@ -84,6 +88,9 @@ func (m *Model) layoutKey(tw, th int) layoutKey {
 	if m.mode == modeEdit {
 		k.row, k.col = b.Row, b.Col
 		k.selOn, k.selLW, k.selIncl, k.selRow, k.selCol = b.SelOn, b.SelLinewise, b.SelInclusive, b.SelRow, b.SelCol
+	}
+	if m.mode == modeView && m.vsel.on {
+		k.vsel = viewSel{on: true, a: m.vsel.a, h: m.vsel.h}
 	}
 	if m.find != nil {
 		k.findOpen, k.findCur, k.findN = true, m.find.Cur, len(m.find.Matches)
@@ -164,6 +171,9 @@ func (m *Model) buildRows(tw, th int) []markdown.Row {
 				}
 			}
 		}
+	}
+	if !editing && m.vsel.on {
+		rows = m.selectRows(rows)
 	}
 	return rows
 }

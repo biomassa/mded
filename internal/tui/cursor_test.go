@@ -31,18 +31,18 @@ func TestCursorConventionalEdit(t *testing.T) {
 		t.Fatal("no cursor in edit mode")
 	}
 	dr := m.docRect()
-	if c.X != dr.x+2 || c.Y != 1 || c.Shape != tea.CursorUnderline || !c.Blink || c.Color == nil {
-		t.Errorf("cursor %+v, want x %d y 1 underline", c, dr.x+2)
+	if c.X != dr.x+3 || c.Y != 1 || c.Shape != tea.CursorUnderline || !c.Blink || c.Color == nil {
+		t.Errorf("cursor %+v, want x %d y 1 underline", c, dr.x+3)
 	}
 	press(m, "down", "right", "right") // after two wide runes: 4 cells
 	c = m.View().Cursor
-	if c == nil || c.X != dr.x+2+4 || c.Y != 2 {
-		t.Errorf("wide runes: cursor %+v, want x %d y 2", c, dr.x+6)
+	if c == nil || c.X != dr.x+3+4 || c.Y != 2 {
+		t.Errorf("wide runes: cursor %+v, want x %d y 2", c, dr.x+7)
 	}
 	press(m, "end") // after the last rune
 	c = m.View().Cursor
-	if c == nil || c.X != dr.x+2+5 {
-		t.Errorf("line end: cursor %+v, want x %d", c, dr.x+7)
+	if c == nil || c.X != dr.x+3+5 {
+		t.Errorf("line end: cursor %+v, want x %d", c, dr.x+8)
 	}
 	press(m, "esc")
 	if m.View().Cursor != nil {
@@ -91,7 +91,7 @@ func TestCursorWrappedLineAndScroll(t *testing.T) {
 		t.Fatal("the line did not wrap")
 	}
 	dr := m.docRect()
-	want := dr.x + 2 + len(last.Cells)
+	want := dr.x + 3 + len(last.Cells) // the border, the margin, the indent
 	if c.X != want || c.Y != 1+cy-m.doc.off {
 		t.Errorf("cursor %d,%d want %d,%d", c.X, c.Y, want, 1+cy-m.doc.off)
 	}

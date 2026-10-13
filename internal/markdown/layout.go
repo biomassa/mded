@@ -35,7 +35,7 @@ func (o LayoutOpts) sourceRows(l []rune, i int, inFence bool) []Row {
 		}
 	}
 	var rows []Row
-	starts := WrapLine(l, o.Width)
+	starts := WrapLine(l, BodyWidth(o.Width)) // every source row has the indent
 	for k, s := range starts {
 		end := len(l)
 		if k+1 < len(starts) {
@@ -137,9 +137,10 @@ func (c *Cache) Layout(lines [][]rune, o LayoutOpts) []Row {
 			rows = append(rows, o.sourceRows(l, i, fence)...)
 		case inBlock[i]:
 			if b, first := blockAt[i]; first { // the block rows come with its first line
+				first, last := codeLines(lines, b)
 				for k, r := range c.BlockRows(lines, b, o.Width) {
-					if !b.Table { // a code block row: its source line, for a click
-						r.Line = min(b.From+k, b.To)
+					if !b.Table { // a code block row: its source line, for a click and a copy
+						r.Line = max(first, min(first+k, last))
 					}
 					rows = append(rows, r)
 				}
@@ -182,4 +183,19 @@ func CursorRow(rows []Row, line, col int) int {
 		return first
 	}
 	return best
+}
+
+// codeLines returns the first and the last code line of a fenced block, without the fence
+// lines. glamour does not show the fences, so row k of the block shows code line first+k
+// (a long line that wraps makes this an approximation). A block with no code gives its
+// first line.
+func codeLines(lines [][]rune, b Block) (first, last int) {
+	first, last = b.From+1, b.To
+	if last > b.From && strings.HasPrefix(strings.TrimSpace(string(lines[last])), "```") {
+		last--
+	}
+	if last < first {
+		return b.From, b.From
+	}
+	return first, last
 }

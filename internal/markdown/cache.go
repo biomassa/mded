@@ -108,17 +108,18 @@ func (c *Cache) Render(src string, w int) []string {
 // BlockRows returns the rows of a fenced code block or a table as the reader shows it.
 // The cache keeps the rendered text.
 func (c *Cache) BlockRows(lines [][]rune, b Block, tw int) []Row {
+	cw := BodyWidth(tw) // a block is body content: it has the indent
 	if b.Table {
-		return c.tableRows(lines, b, tw)
+		return c.tableRows(lines, b, cw)
 	}
 	text := make([]string, 0, b.To-b.From+1)
 	for j := b.From; j <= b.To; j++ {
 		text = append(text, string(lines[j]))
 	}
-	rendered := c.Render(strings.Join(text, "\n"), tw+2)
+	rendered := c.Render(strings.Join(text, "\n"), cw+2)
 	rows := make([]Row, len(rendered))
 	for k, l := range rendered {
-		rows[k] = Row{Pre: l}
+		rows[k] = Row{Pre: " " + l} // one cell of indent, like all body rows
 	}
 	return rows
 }
@@ -136,14 +137,18 @@ func (c *Cache) PreviewRows(src string, tw int) []Row {
 	}
 	var rows []Row
 	cells, level := PreviewCells(src)
-	if level == -1 { // a rule
-		rows = []Row{{Pre: " " + theme.St(theme.Dim).Render(strings.Repeat("─", tw))}}
+	if level == -1 { // a rule: the margin, the indent, and the line
+		rows = []Row{{Pre: "  " + theme.St(theme.Dim).Render(strings.Repeat("─", BodyWidth(tw)))}}
 	} else {
+		wrapW := BodyWidth(tw) // a heading bar has no indent: its first cell is the padding
+		if level > 0 {
+			wrapW = tw
+		}
 		rs := make([]rune, len(cells))
 		for k, cl := range cells {
 			rs[k] = cl.R
 		}
-		starts := WrapLine(rs, tw)
+		starts := WrapLine(rs, wrapW)
 		for k, s := range starts {
 			end := len(cells)
 			if k+1 < len(starts) {
@@ -161,6 +166,20 @@ func (c *Cache) PreviewRows(src string, tw int) []Row {
 	return rows
 }
 
+// BodyWidth returns the width of the text of a row that is not a heading bar. The row has
+// one cell of indent, so that its text starts in the same column as the text of a heading.
+func BodyWidth(tw int) int { return max(1, tw-1) }
+
+// Indent returns the number of cells between the row margin and the first cell of the
+// row: 0 for a heading bar (its first cell is the padding of the bar), else 1. A heading
+// line that shows as source has the indent inside its bar.
+func (r Row) Indent() int {
+	if r.Fill > 0 && !r.Source {
+		return 0
+	}
+	return 1
+}
+
 // RenderRow draws a row of width tw. cx is the cursor column in the row, or -1. An image
 // row gives "": the UI draws it.
 func RenderRow(r Row, tw, cx int) string {
@@ -169,6 +188,14 @@ func RenderRow(r Row, tw, cx int) string {
 	}
 	if r.Pre != "" || r.Cells == nil && !r.Source && r.Fill == 0 {
 		return r.Pre
+	}
+	lead := " " // the row margin
+	switch {
+	case r.Indent() == 0:
+	case r.Fill > 0: // a heading as source: the indent belongs to the bar
+		lead += theme.HeadingStyle(r.Fill).Render(" ")
+	default:
+		lead += " "
 	}
 	var b strings.Builder
 	for k := 0; k < len(r.Cells); k++ {
@@ -190,11 +217,11 @@ func RenderRow(r Row, tw, cx int) string {
 		b.WriteString(lipgloss.NewStyle().Reverse(true).Render(" "))
 	}
 	if r.Fill > 0 { // fill the bar to the full width
-		if n := tw - lipgloss.Width(b.String()); n > 0 {
+		if n := tw - r.Indent() - lipgloss.Width(b.String()); n > 0 {
 			b.WriteString(theme.HeadingStyle(r.Fill).Render(strings.Repeat(" ", n)))
 		}
 	}
-	return " " + b.String()
+	return lead + b.String()
 }
 
 // joins reports whether r joins the rune before it: a variation selector or a

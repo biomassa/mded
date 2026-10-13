@@ -59,7 +59,7 @@ func (m *Model) imageSize(ref markdown.ImageRef) (cols, rows int, ok bool) {
 // sizeOf returns the size of an image file in cells. The image loads in the background.
 func (m *Model) sizeOf(path string) (cols, rows int, ok bool) {
 	img := m.opts.Images
-	cols, rows, ok = img.Size(path, m.textW(), m.maxImageRows())
+	cols, rows, ok = img.Size(path, m.bodyW(), m.maxImageRows())
 	if !ok && !m.imgTried[path] {
 		m.imgTried[path] = true
 		m.cmd(img.Load(path))
@@ -82,7 +82,7 @@ func (m *Model) imageDocRows(tw, th int) []markdown.Row {
 			return out
 		}
 	}
-	return []markdown.Row{{Pre: " " + name}}
+	return []markdown.Row{{Pre: "  " + name}}
 }
 
 // placeImages finds the image rows in view and sends their images to the terminal. Place
@@ -103,7 +103,7 @@ func (m *Model) placeImages(tw, th int) {
 		if !ok {
 			continue
 		}
-		cols, rows, ok := img.Size(path, tw, m.maxImageRows())
+		cols, rows, ok := img.Size(path, markdown.BodyWidth(tw), m.maxImageRows())
 		if !ok {
 			continue
 		}

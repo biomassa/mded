@@ -123,7 +123,19 @@ var (
 	}
 )
 
-// helpSections returns the keys of the current focus and mode.
+// pickerHelp lists the keys of the image picker.
+var pickerHelp = []helpKey{
+	{"", "Image picker"},
+	{"↑, ↓", "move"},
+	{"→, enter", "open a directory"},
+	{"←", "go to the parent directory"},
+	{"text, backspace", "filter the names"},
+	{"enter", "pick the image, then type the alt text"},
+	{"esc", "close"},
+}
+
+// helpSections returns all key sections. The section of the current focus and mode comes
+// first, and the keys that work everywhere come last.
 func (m *Model) helpSections() [][]helpKey {
 	var first []helpKey
 	switch {
@@ -136,25 +148,40 @@ func (m *Model) helpSections() [][]helpKey {
 	default:
 		first = convHelp
 	}
-	return [][]helpKey{first, globalHelp}
-}
-
-// helpRect is the area of the overlay: in the middle of the screen.
-func (m *Model) helpRect() rect {
-	n := 0
-	for _, s := range m.helpSections() {
-		n += len(s) + 1
+	out := [][]helpKey{first}
+	for _, sec := range [][]helpKey{viewHelp, convHelp, vimHelp, treeHelp, pickerHelp} {
+		if &sec[0] != &first[0] {
+			out = append(out, sec)
+		}
 	}
-	w := min(66, max(20, m.width-4))
-	h := min(n+2, max(5, m.height-3))
-	return rect{max(0, (m.width-w)/2), max(0, (m.height-1-h)/2), w, h}
+	return append(out, globalHelp)
 }
 
-// helpBox draws the overlay.
-func (m *Model) helpBox() string {
-	r := m.helpRect()
-	inner := r.w - 2
-	keyW := min(28, inner/2)
+// helpMaxW is the largest width of the overlay.
+const helpMaxW = 90
+
+// helpCols returns the width of the key column and of the text column for a screen width.
+// The key column fits the longest key. The text column fits the longest text if the screen
+// is wide enough.
+func (m *Model) helpCols() (keyW, textW int) {
+	textW = 1
+	for _, sec := range m.helpSections() {
+		for _, k := range sec {
+			if k.key != "" {
+				keyW = max(keyW, lipgloss.Width(k.key)+2)
+				textW = max(textW, lipgloss.Width(k.text))
+			}
+		}
+	}
+	inner := min(helpMaxW, max(20, m.width-4)) - 2
+	keyW = min(keyW, inner/2)
+	return keyW, max(1, min(textW, inner-keyW-1))
+}
+
+// helpLines returns all lines of the overlay. A text that is wider than its column wraps
+// to more lines, under the text column.
+func (m *Model) helpLines() []string {
+	keyW, textW := m.helpCols()
 	var lines []string
 	for _, sec := range m.helpSections() {
 		for _, k := range sec {
@@ -164,10 +191,34 @@ func (m *Model) helpBox() string {
 			}
 			key := theme.St(theme.Fg(theme.Accent)).Render(ui.Trunc(k.key, keyW-1))
 			pad := strings.Repeat(" ", max(1, keyW-lipgloss.Width(key)))
-			lines = append(lines, " "+key+pad+theme.St(theme.Text).Render(ui.Trunc(k.text, max(1, inner-keyW-2))))
+			wrapped := strings.Split(lipgloss.NewStyle().Width(textW).Render(k.text), "\n")
+			for i, part := range wrapped {
+				text := theme.St(theme.Text).Render(strings.TrimRight(part, " "))
+				if i == 0 {
+					lines = append(lines, " "+key+pad+text)
+				} else {
+					lines = append(lines, " "+strings.Repeat(" ", keyW)+text)
+				}
+			}
 		}
 		lines = append(lines, "")
 	}
+	return lines[:len(lines)-1]
+}
+
+// helpRect is the area of the overlay: in the middle of the screen, as wide as its content.
+func (m *Model) helpRect() rect {
+	keyW, textW := m.helpCols()
+	w := min(keyW+textW+4, max(20, m.width-4))
+	h := min(len(m.helpLines())+2, max(5, m.height-3))
+	return rect{max(0, (m.width-w)/2), max(0, (m.height-1-h)/2), w, h}
+}
+
+// helpBox draws the overlay.
+func (m *Model) helpBox() string {
+	r := m.helpRect()
+	inner := r.w - 2
+	lines := m.helpLines()
 	rows := r.h - 2
 	m.help.off = max(0, min(m.help.off, len(lines)-rows))
 	lines = lines[m.help.off:]

@@ -85,7 +85,7 @@ func (m *Model) docLines(iw, ph int) []string {
 		switch {
 		case r.Img != nil:
 			if p, ok := m.placed[i]; ok {
-				s = " " + kitty.RowString(p.id, r.ImgRow, p.cols)
+				s = "  " + kitty.RowString(p.id, r.ImgRow, p.cols) // the margin and the indent
 			}
 		default:
 			s = markdown.RenderRow(r, tw, -1) // the terminal draws the cursor: see cursor
@@ -376,7 +376,7 @@ func (m *Model) docCursor() *tea.Cursor {
 		cx = ansi.StringWidth(sb.String())
 	}
 	dr := m.docRect()
-	x := dr.x + 2 + cx // the pane border, the row margin, and the cells before the cursor
+	x := dr.x + 2 + r.Indent() + cx // the pane border, the row margin, the indent, and the cells before the cursor
 	y := 1 + m.textTop() + cy - d.off
 	return newCursor(min(x, dr.x+dr.w-2), y, m.docCursorShape())
 }

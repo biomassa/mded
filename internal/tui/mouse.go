@@ -41,6 +41,7 @@ func (m *Model) onBorder(x, y int) bool {
 func (m *Model) mouseClick(ms tea.Mouse) {
 	x, y := ms.X, ms.Y
 	dbl := m.isDoubleClick(x, y)
+	m.vsel = viewSel{} // a press ends the selection of the view
 	switch {
 	case m.quitting || m.dlg != nil:
 		return
@@ -121,7 +122,7 @@ func (m *Model) posAt(x, y int) (line, col, src int, ok bool) {
 	if r.Cells == nil { // a rendered block or an image: the start of its line
 		return r.Line, 0, -1, true
 	}
-	k := x - m.docRect().x - 2 // the border and the margin
+	k := m.cellAt(r, x) // the cell under x: the border, the margin, and the indent come first
 	col, src = n, -1
 	switch {
 	case k >= 0 && k < len(r.Cells):
@@ -158,27 +159,35 @@ type mouseKeymap interface {
 
 // docClick handles a left click in the document pane.
 func (m *Model) docClick(x, y int, dbl bool) {
-	line, col, src, ok := m.posAt(x, y)
+	if m.mode != modeEdit {
+		m.viewPress(x, y, dbl)
+		return
+	}
+	line, col, _, ok := m.posAt(x, y)
+	if !ok {
+		return
+	}
+	b := m.doc.buf
+	if mk, ok := m.km.(mouseKeymap); ok && m.vimFlavor {
+		mk.LeaveVisual(b)
+	}
+	b.MoveTo(line, col)
+	b.SelRow, b.SelCol, b.SelOn = line, col, false
+	b.BreakTyping()
+	m.dragSel = true
+	m.follow = true
+}
+
+// viewClick runs the action of a click in view mode, when the button goes up on the cell
+// where it went down.
+func (m *Model) viewClick(x, y int, dbl bool) {
+	line, _, src, ok := m.posAt(x, y)
 	if !ok {
 		return
 	}
 	b := m.doc.buf
 	act := m.lastAct
 	m.lastAct = clickAct{}
-	if m.mode == modeEdit {
-		if mk, ok := m.km.(mouseKeymap); ok && m.vimFlavor {
-			mk.LeaveVisual(b)
-		}
-		b.MoveTo(line, col)
-		b.SelRow, b.SelCol, b.SelOn = line, col, false
-		b.BreakTyping()
-		m.dragSel = true
-		m.follow = true
-		return
-	}
-	if m.doc.image {
-		return
-	}
 	if dbl {
 		switch {
 		case act.link: // the first click followed the link
@@ -216,6 +225,8 @@ func (m *Model) mouseMotion(ms tea.Mouse) {
 	case m.dragBorder:
 		m.sidebarW = max(8, min(ms.X+1, m.width-minDocWidth))
 		m.dragWidth = m.sidebarW
+	case m.vsel.drag:
+		m.viewDrag(ms.X, ms.Y)
 	case m.dragSel && m.mode == modeEdit:
 		line, col, _, ok := m.posAt(ms.X, ms.Y)
 		if !ok {
@@ -239,6 +250,10 @@ func (m *Model) mouseMotion(ms tea.Mouse) {
 
 func (m *Model) mouseRelease(ms tea.Mouse) {
 	m.dragSel = false
+	if m.vsel.drag {
+		m.viewRelease()
+		return
+	}
 	if !m.dragBorder {
 		return
 	}
@@ -266,6 +281,9 @@ func (m *Model) mouseWheel(ms tea.Mouse) {
 	case m.themes != nil || m.dlg != nil:
 	case m.help != nil:
 		m.help.off += d
+	case m.vsel.drag: // a drag in the view: the pane scrolls, and the selection follows the pointer
+		m.doc.off = m.clampOff(m.doc.off + d)
+		m.viewDrag(ms.X, ms.Y)
 	case m.treeRect().has(ms.X, ms.Y):
 		m.tree.Scroll(d)
 	case m.docRect().has(ms.X, ms.Y):

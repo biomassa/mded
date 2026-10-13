@@ -7,7 +7,15 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- In view mode, a mouse drag selects text. When you release the button, mded copies the markdown source of the selection to the system clipboard.
+- The help (`?`, `F1`) shows the keys of all modes. The keys of the current mode come first. Long descriptions wrap.
+
 ### Changed
+
+- All text, except the heading bars, starts one cell more to the right. Thus the body text is in line with the heading text.
+- A click in view mode acts when you release the button.
 
 - The accent of the default theme is blue (`#4180FF`), not red. It colors the focused border, the mode label, the cursor, the markers, and the headings.
 - The heading bars use the accent of the theme again, also in the default theme. The steps between the levels are larger: level 1 is stronger, and each lower level is fainter. Levels 1 and 2 have bright bold text, levels 3 and 4 bold text, and levels 5 and 6 muted text that is not bold.

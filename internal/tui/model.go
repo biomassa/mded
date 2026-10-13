@@ -129,6 +129,7 @@ type Model struct {
 	lastClick  clickInfo
 	dragBorder bool
 	dragSel    bool
+	vsel       viewSel  // the mouse selection of view mode
 	lastAct    clickAct // what the last click in the view did, for a double-click
 	dragWidth  int
 
@@ -221,6 +222,7 @@ func (m *Model) update(msg tea.Msg) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		m.vsel = viewSel{} // the rows change
 	case tea.BackgroundColorMsg:
 		m.termDark = msg.IsDark()
 		if theme.Current() != "default" {
@@ -312,6 +314,7 @@ func (m *Model) promptOpen() bool {
 // key routes a key press. The order: dialog, quit, overlays, prompts, global keys, the pane.
 func (m *Model) key(msg tea.KeyPressMsg) {
 	k := msg.String()
+	m.vsel = viewSel{} // any key ends the selection of the view, and then does its own action
 	if m.dlg != nil {
 		m.dialogKey(k)
 		return
@@ -477,6 +480,7 @@ func (m *Model) setDoc(d *doc) {
 	}
 	m.doc = d
 	m.mode = modeView
+	m.vsel = viewSel{}
 	m.find, m.search = nil, nil
 	m.itemSel, m.srchPos, m.laid = -1, false, false
 	m.follow = false
@@ -673,6 +677,7 @@ func (m *Model) enterEdit(at *[2]int) {
 		return
 	}
 	m.mode = modeEdit
+	m.vsel = viewSel{}
 	m.km = m.currentKm()
 	m.km.Reset()
 	b := d.buf
@@ -789,7 +794,7 @@ func (m *Model) editKey(msg tea.KeyPressMsg) {
 		m.save()
 		return
 	}
-	m.apply(m.km.Handle(b, keymap.Key{Name: k, Text: msg.Text}, m.textW(), m.textH()))
+	m.apply(m.km.Handle(b, keymap.Key{Name: k, Text: msg.Text}, m.bodyW(), m.textH()))
 }
 
 // topLine returns the source line at the top of the pane.

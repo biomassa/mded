@@ -776,12 +776,18 @@ func TestBorderDragSavesWidth(t *testing.T) {
 	}
 }
 
+// clickAt presses and releases the left button on one cell.
+func clickAt(m *Model, x, y int) {
+	m.Update(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	m.Update(tea.MouseReleaseMsg{X: x, Y: y, Button: tea.MouseLeft})
+}
+
 func TestViewClickOnCheckbox(t *testing.T) {
 	p := writeTemp(t, "a.md", "- [ ] one\n", 0o644)
 	m := testModel(t, p)
 	// The checkbox cell: border, margin, then the marker.
-	x, y := 1+1+0, 1
-	m.Update(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	x, y := 1+1+1+0, 1 // border, margin, indent
+	clickAt(m, x, y)
 	if got := string(m.doc.buf.Lines[0]); got != "- [x] one" {
 		t.Errorf("line %q", got)
 	}
@@ -804,8 +810,8 @@ func TestEmptyPaneHasNoEdit(t *testing.T) {
 	if m.mode != modeView {
 		t.Fatal("edit mode in a document without a file")
 	}
-	m.Update(tea.MouseClickMsg{X: 60, Y: 3, Button: tea.MouseLeft})
-	m.Update(tea.MouseClickMsg{X: 60, Y: 3, Button: tea.MouseLeft})
+	clickAt(m, 60, 3)
+	clickAt(m, 60, 3)
 	if m.mode != modeView {
 		t.Fatal("double-click opened edit mode")
 	}
@@ -828,7 +834,7 @@ func TestNoSearchPatternMessage(t *testing.T) {
 func TestDoubleClickOnCheckbox(t *testing.T) {
 	p := writeTemp(t, "a.md", "- [ ] one\n- [ ] two\n", 0o644)
 	m := testModel(t, p)
-	click := func(y int) { m.Update(tea.MouseClickMsg{X: 2, Y: y, Button: tea.MouseLeft}) }
+	click := func(y int) { clickAt(m, 3, y) }
 	click(1)
 	click(1)
 	if got := m.doc.buf.Text(); got != "- [ ] one\n- [ ] two" || m.doc.buf.Dirty() {
@@ -862,8 +868,8 @@ func TestDoubleClickOnLink(t *testing.T) {
 	os.WriteFile(a, []byte("[go](b.md)\n"), 0o644)
 	os.WriteFile(b, []byte("text\n"), 0o644)
 	m := testModel(t, a)
-	m.Update(tea.MouseClickMsg{X: 2, Y: 1, Button: tea.MouseLeft})
-	m.Update(tea.MouseClickMsg{X: 2, Y: 1, Button: tea.MouseLeft})
+	clickAt(m, 3, 1)
+	clickAt(m, 3, 1)
 	if m.doc.path != b || m.mode != modeView {
 		t.Errorf("doc %q mode %v", m.doc.path, m.mode)
 	}
