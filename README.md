@@ -10,7 +10,7 @@ mded is a markdown viewer and editor for the terminal.
 - **Edit mode with a live preview.** The line with the cursor shows its source. All other lines show formatted.
 - **Two edit modes.** A conventional mode (as in most text editors) and a vim mode. `ctrl+g` changes between them.
 - **Search with `/`**, as in neovim: regular expressions, smartcase, incremental search, and highlights of all matches.
-- **Pictures** in kitty and Ghostty, through the kitty graphics protocol.
+- **Pictures** in kitty and Ghostty, through the kitty graphics protocol, and a picker that inserts pictures.
 - **Sidebar** with a directory tree, a filter, and file operations.
 - **Color themes**, with a theme picker.
 
@@ -101,6 +101,7 @@ A link to a file opens the file in mded. A link with `#heading` goes to that hea
 | `tab` | Insert spaces (`tab_width`). |
 | `enter` | Start a new line. On a list item, start the next item. On an empty item, end the list. |
 | `ctrl+f` | Find and replace. |
+| `ctrl+p` | Insert a picture (see [Insert a picture](#insert-a-picture)). |
 | `ctrl+s` | Save. |
 | `esc` | Go back to view mode. |
 
@@ -116,6 +117,7 @@ Vim mode has normal, insert, replace, visual, and visual line modes. It has:
 - Registers: `"a`–`"z`, `"0`–`"9`, `"-`, `"_`, and `"+` / `"*` for the system clipboard. Each yank and delete also goes to the system clipboard.
 - `o` and `O` on a list item start a new item.
 - Marks (`m`) and macros (`q`, `@`).
+- `ctrl+p` in normal mode and insert mode, or `:img`, inserts a picture.
 - Commands: `:w`, `:w FILE`, `:q`, `:q!`, `:wq`, `:x`, `:e FILE`, `:noh`, `:N`, and `:s` with ranges and the flags `g`, `i`, `I`, and `c`.
 
 The patterns of `/` and `:s` use the Go syntax: `(`, `)`, `|`, `+`, `?`, and `{` are special characters. `:s` also accepts the vim forms `\(`, `\)`, `\|`, `\<`, and `\>`. In the replacement, `\1`–`\9` and `&` insert the groups and the match.
@@ -132,6 +134,16 @@ mded shows pictures in terminals with the kitty graphics protocol: kitty and Gho
 - A picture alone on its line replaces the line. A picture in a line of text shows below the line.
 - In edit mode, the line with the cursor shows its source, and its pictures do not show.
 - Without picture support, mded shows `🖼` and the alt text, or the file name if the alt text is empty.
+
+### Insert a picture
+
+`ctrl+p` in edit mode opens the picture picker. In vim mode, `:img` also opens it.
+
+- The picker starts in the directory of the document. It shows directories and picture files (PNG, JPEG, GIF, and WebP). The first line shows the directory.
+- `↑` and `↓` move. `→` opens a directory, and `←` goes to the parent directory. Type text to filter the names. `enter` picks a file, and `esc` closes the picker.
+- The right side of the picker shows the picture under the cursor. Without picture support, it shows the file size and the size in pixels.
+- After you pick a file, type the alt text on the status line. The file name is the default. `enter` inserts the picture, and `esc` goes back to the picker.
+- mded inserts the line `![alt](path)` below the cursor line. The path is relative to the directory of the document. In the path, a space becomes `%20`, and `%`, `(`, and `)` become `%25`, `%28`, and `%29`. The cursor stays on its line, so the picture shows at once. One undo removes the line.
 
 ## Sidebar
 
