@@ -131,7 +131,7 @@ type Keymap interface {
 
 	// StatusLine returns the text of a prompt that the keymap shows in the status line, such
 	// as ":w" or "/text" or the question of :s with the flag c. cursorCol is the cursor
-	// position in runes in text. active is false if there is no prompt. The UI shows the
+	// position in runes in text, or -1 if the text has no cursor (a note). active is false if there is no prompt. The UI shows the
 	// prompt in place of the hints and the messages.
 	StatusLine() (text string, cursorCol int, active bool)
 

@@ -350,3 +350,25 @@ func TestNoMatchesRow(t *testing.T) {
 		t.Fatal("note without filter")
 	}
 }
+
+func TestPromptCursor(t *testing.T) {
+	dir := t.TempDir()
+	tr, err := New(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tr.PromptCursor() != -1 {
+		t.Error("no prompt: the cursor column must be -1")
+	}
+	tr.HandleKey(key("ctrl+n"))
+	for _, r := range "日a" {
+		tr.HandleKey(tea.KeyPressMsg{Code: r, Text: string(r)})
+	}
+	if got, want := tr.PromptCursor(), len("new file: ")+3; got != want {
+		t.Errorf("cursor %d, want %d", got, want)
+	}
+	tr.HandleKey(key("left"))
+	if got, want := tr.PromptCursor(), len("new file: ")+2; got != want {
+		t.Errorf("after left: cursor %d, want %d", got, want)
+	}
+}

@@ -5,10 +5,12 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/biomassa/mded/internal/keymap/conv"
 	"github.com/biomassa/mded/internal/kitty"
 	"github.com/biomassa/mded/internal/markdown"
 	"github.com/biomassa/mded/internal/theme"
@@ -31,6 +33,7 @@ func (m *Model) View() tea.View {
 	if bg := theme.Bg(); bg != "" { // a palette theme sets the terminal background while mded runs
 		v.BackgroundColor = theme.C(bg)
 	}
+	v.Cursor = m.cursor()
 	return v
 }
 
@@ -75,11 +78,6 @@ func (m *Model) docLines(iw, ph int) []string {
 	}
 	th := ph - len(out)
 	tw := iw - 2
-	b := d.buf
-	cy := -1
-	if m.mode == modeEdit && m.focus == focusDoc {
-		cy = markdown.CursorRow(m.rows, b.Row, b.Col)
-	}
 	fill := lipgloss.NewStyle()
 	for i := d.off; i < d.off+th && i < len(m.rows); i++ {
 		r := m.rows[i]
@@ -90,11 +88,7 @@ func (m *Model) docLines(iw, ph int) []string {
 				s = " " + kitty.RowString(p.id, r.ImgRow, p.cols)
 			}
 		default:
-			cx := -1
-			if i == cy {
-				cx = b.Col - r.Start
-			}
-			s = markdown.RenderRow(r, tw, cx)
+			s = markdown.RenderRow(r, tw, -1) // the terminal draws the cursor: see cursor
 		}
 		out = append(out, ui.Pad(s, iw, fill))
 	}
@@ -124,7 +118,7 @@ func (m *Model) position() string {
 }
 
 // promptLine returns the text of the prompt that owns the status line, if there is one.
-// cursor is the position of the text cursor in cells, or -1.
+// cursor is the position of the text cursor in runes, or -1.
 func (m *Model) promptLine() (text string, cursor int, note string, ok bool) {
 	switch {
 	case m.dlg != nil:
@@ -138,7 +132,7 @@ func (m *Model) promptLine() (text string, cursor int, note string, ok bool) {
 		return t, c, m.search.note, true
 	}
 	if line, on := m.tree.Prompt(); on {
-		return line, -1, "", true
+		return line, -1, "", true // m.cursor() asks the tree for the cursor column
 	}
 	if m.mode == modeEdit && m.focus == focusDoc && m.find == nil {
 		if t, c, on := m.km.StatusLine(); on {
@@ -148,28 +142,12 @@ func (m *Model) promptLine() (text string, cursor int, note string, ok bool) {
 	return "", -1, "", false
 }
 
-// withCursor draws a plain text with a block cursor at rune position c.
-func withCursor(text string, c int) string {
-	rs := []rune(text)
-	if c < 0 || c > len(rs) {
-		return text
-	}
-	cur := lipgloss.NewStyle().Reverse(true)
-	if c == len(rs) {
-		return string(rs) + cur.Render(" ")
-	}
-	return string(rs[:c]) + cur.Render(string(rs[c])) + string(rs[c+1:])
-}
-
 // statusLine draws the last row: the mode label, the path, the hints or a message, and
 // the position. A prompt replaces all of it.
 func (m *Model) statusLine() string {
 	w := m.width
 	base := lipgloss.NewStyle()
-	if text, cur, note, ok := m.promptLine(); ok {
-		if cur >= 0 {
-			text = withCursor(text, cur)
-		}
+	if text, _, note, ok := m.promptLine(); ok {
 		right := ""
 		if note != "" {
 			right = theme.St(theme.Error).Render(note)
@@ -271,4 +249,134 @@ func (m *Model) overlays(screen string) string {
 		return screen
 	}
 	return lipgloss.NewCompositor(layers...).Render()
+}
+
+// cursorShaper is the optional interface of a keymap that has modes: Mode returns
+// "normal", "insert", "replace", "visual", or "vline". The vim engine has it. The
+// package does not import the vim package.
+type cursorShaper interface{ Mode() string }
+
+// docCursorShape returns the shape of the document cursor for the keymap: a block in the
+// normal and visual modes of vim, an underscore in all other cases.
+func (m *Model) docCursorShape() tea.CursorShape {
+	if k, ok := m.km.(cursorShaper); ok {
+		switch k.Mode() {
+		case "normal", "visual", "vline":
+			return tea.CursorBlock
+		}
+	}
+	return tea.CursorUnderline
+}
+
+// newCursor returns a blinking cursor in the accent color at x, y.
+func newCursor(x, y int, shape tea.CursorShape) *tea.Cursor {
+	c := tea.NewCursor(x, y)
+	c.Color = theme.C(theme.Accent)
+	c.Shape = shape
+	c.Blink = true
+	return c
+}
+
+// textWidth returns the width in cells of the first n runes of text.
+func textWidth(text string, n int) int {
+	rs := []rune(text)
+	return ansi.StringWidth(string(rs[:max(0, min(n, len(rs)))]))
+}
+
+// cursor returns the terminal cursor for the screen, or nil if the cursor is hidden. Only
+// one place has the cursor: an open prompt, then a field of the find box, then the
+// document in edit mode. View mode, the popups without a text field, and the dialogs have
+// none.
+func (m *Model) cursor() *tea.Cursor {
+	if m.width == 0 || m.doc == nil || m.dlg != nil || m.help != nil || m.themes != nil {
+		return nil
+	}
+	if m.img != nil && !m.img.altOn { // the list of the image picker has no text field
+		return nil
+	}
+	row := m.height - 1 // the status line
+	statusAt := func(text string, c int) *tea.Cursor {
+		x := min(textWidth(text, c), max(0, m.width-1))
+		return newCursor(x, row, tea.CursorUnderline)
+	}
+	switch {
+	case m.img != nil:
+		t, c := m.img.altLine()
+		return statusAt(t, c)
+	case m.search != nil:
+		t, c := m.search.line()
+		return statusAt(t, c)
+	}
+	if _, on := m.tree.Prompt(); on {
+		c := m.tree.PromptCursor()
+		if c < 0 { // the question of a delete has no text field
+			return nil
+		}
+		return newCursor(min(c, max(0, m.width-1)), row, tea.CursorUnderline)
+	}
+	if m.mode != modeEdit || m.focus != focusDoc {
+		return nil
+	}
+	if m.find != nil {
+		return m.findCursor()
+	}
+	if t, c, on := m.km.StatusLine(); on && c >= 0 {
+		return statusAt(t, c)
+	}
+	return m.docCursor()
+}
+
+// findCursor returns the cursor of the focused text field of the find box, or nil if the
+// focus is on the check box or if the field is not on the screen.
+func (m *Model) findCursor() *tea.Cursor {
+	f := m.find
+	var in *textinput.Model
+	switch f.Focus {
+	case conv.FieldFind:
+		in = &f.Find
+	case conv.FieldReplace:
+		in = &f.Repl
+	default:
+		return nil
+	}
+	dr := m.docRect()
+	y := 2 + f.Focus // the pane border, the box border, then the fields in order
+	if y >= dr.h-1 || y >= len(m.findLn) {
+		return nil
+	}
+	rs := []rune(in.Value())
+	pos := max(0, min(in.Position(), len(rs)))
+	w := ansi.StringWidth(in.Prompt)
+	cw := ansi.StringWidth(string(rs[:pos]))
+	if n := in.Width(); n > 0 {
+		cw = min(cw, n) // the field scrolls: the cursor stays in its width
+	}
+	x := dr.x + 2 + w + cw // the pane border and the box border
+	return newCursor(min(x, dr.x+dr.w-3), y, tea.CursorUnderline)
+}
+
+// docCursor returns the cursor in the text of the document, or nil if its row is not on
+// the screen.
+func (m *Model) docCursor() *tea.Cursor {
+	d := m.doc
+	b := d.buf
+	cy := markdown.CursorRow(m.rows, b.Row, b.Col)
+	th := m.textH()
+	if cy < 0 || cy < d.off || cy >= d.off+th || cy >= len(m.rows) {
+		return nil
+	}
+	r := m.rows[cy]
+	cx := 0
+	if r.Img == nil {
+		n := max(0, min(b.Col-r.Start, len(r.Cells)))
+		var sb strings.Builder
+		for _, cl := range r.Cells[:n] {
+			sb.WriteRune(cl.R)
+		}
+		cx = ansi.StringWidth(sb.String())
+	}
+	dr := m.docRect()
+	x := dr.x + 2 + 1 + cx // the pane border, the margin, and the cells before the cursor
+	y := 1 + m.textTop() + cy - d.off
+	return newCursor(min(x, dr.x+dr.w-2), y, m.docCursorShape())
 }

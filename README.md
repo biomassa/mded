@@ -44,6 +44,8 @@ The file opens in view mode. Push `e` or `i` to edit. The cursor goes to its las
 - **Conventional mode.** `esc` goes back to view mode.
 - **Vim mode.** `esc` goes from insert mode or visual mode to normal mode. `esc` in normal mode goes back to view mode.
 
+In edit mode, the cursor is a blinking underscore. In vim normal mode and visual mode, it is a blinking block. The cursor has the accent color of the theme.
+
 `ctrl+g` changes the edit mode between conventional and vim. In view mode, it sets the mode that `e` and `i` open. The status line shows the mode: `VIEW`, `EDIT`, `NORMAL`, `INSERT`, `VISUAL`, `V-LINE`, or `REPLACE`.
 
 ## Save and quit

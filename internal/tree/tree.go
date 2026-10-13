@@ -13,6 +13,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/biomassa/mded/internal/theme"
 	"github.com/biomassa/mded/internal/ui"
@@ -115,6 +116,7 @@ func New(root string, showHidden bool) (*Tree, error) {
 	s := textinput.DefaultStyles(theme.Dark())
 	s.Cursor.Blink = false
 	ti.SetStyles(s)
+	ti.SetVirtualCursor(false) // the UI shows the real terminal cursor: see PromptCursor
 	ti.Prompt = ""
 	t.input = ti
 	return t, nil
@@ -430,17 +432,39 @@ func (t *Tree) Click(y int, double bool) Action {
 	return Action{}
 }
 
+// promptLabel returns the text before the input field of a text prompt, or "" if the
+// mode has no input field.
+func (t *Tree) promptLabel() string {
+	switch t.mode {
+	case modeFilter:
+		return "/"
+	case modeNewFile:
+		return "new file: "
+	case modeNewDir:
+		return "new directory: "
+	case modeRename:
+		return "rename to: "
+	}
+	return ""
+}
+
+// PromptCursor returns the column of the text cursor in the line that Prompt gives, in
+// cells. It gives -1 if no text prompt is open (also for the delete question).
+func (t *Tree) PromptCursor() int {
+	label := t.promptLabel()
+	if label == "" {
+		return -1
+	}
+	rs := []rune(t.input.Value())
+	pos := max(0, min(t.input.Position(), len(rs)))
+	return ansi.StringWidth(label) + ansi.StringWidth(string(rs[:pos]))
+}
+
 // Prompt returns the status line text of an open prompt, filter, or dialog.
 func (t *Tree) Prompt() (string, bool) {
 	switch t.mode {
-	case modeFilter:
-		return "/" + t.input.View(), true
-	case modeNewFile:
-		return "new file: " + t.input.View(), true
-	case modeNewDir:
-		return "new directory: " + t.input.View(), true
-	case modeRename:
-		return "rename to: " + t.input.View(), true
+	case modeFilter, modeNewFile, modeNewDir, modeRename:
+		return t.promptLabel() + t.input.View(), true
 	case modeDelete:
 		name := filepath.Base(t.target)
 		q := "Delete " + name + "?"

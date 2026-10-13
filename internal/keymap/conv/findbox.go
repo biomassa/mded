@@ -34,6 +34,7 @@ func newInput(prompt string) textinput.Model {
 	s := textinput.DefaultStyles(true)
 	s.Cursor.Blink = false
 	ti.SetStyles(s)
+	ti.SetVirtualCursor(false) // the UI shows the real terminal cursor
 	return ti
 }
 

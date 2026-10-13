@@ -392,7 +392,8 @@ func (v *Vim) Paste(b *buffer.Buffer, text string) []keymap.Effect {
 }
 
 // StatusLine returns the prompt text: the : and / prompts, the question of :s with the flag
-// c, or the recording note. cursorCol is the end of the text for the last two.
+// c, or the recording note. cursorCol is the end of the text for the question of :s. The
+// recording note is not a text field: its cursorCol is -1.
 func (v *Vim) StatusLine() (string, int, bool) {
 	switch {
 	case v.conf != nil:
@@ -401,8 +402,7 @@ func (v *Vim) StatusLine() (string, int, bool) {
 	case v.prompt != nil:
 		return string(v.prompt.kind) + string(v.prompt.text), 1 + v.prompt.pos, true
 	case v.recReg != 0:
-		t := "recording @" + string(v.recReg)
-		return t, len([]rune(t)), true
+		return "recording @" + string(v.recReg), -1, true
 	}
 	return "", 0, false
 }
