@@ -9,12 +9,13 @@ config.toml
 *.env
 
 # AI assistant files
-CLAUDE.md
-CLAUDE.local.md
-.claude/
-.claude-work/
+CLAUDE*.md
+.claude*
 .mcp.json
 AGENTS.md
 
 # Release builds
 /dist/
+
+# Local design notes
+/docs/DESIGN.md

@@ -2,6 +2,8 @@
 
 mded is a markdown viewer and editor for the terminal.
 
+> This software was developed with the assistance of a LLM.
+
 ## Features
 
 - **View mode.** The document shows as formatted markdown: heading bars, lists, checkboxes, links, quotes, rules, code with syntax colors, and tables.
@@ -112,8 +114,13 @@ Vim mode has normal, insert, replace, visual, and visual line modes. It has:
 - Operators: `d c y > < gu gU g~`, with motions and text objects (`iw aw iW aW is as ip ap i" a" i' a' i( a( i[ a[ i{ a{ i< a<` and others).
 - Edits: `x X s S r J ~ p P i a I A o O R u ctrl+r .`, with counts.
 - Registers: `"a`–`"z`, `"0`–`"9`, `"-`, `"_`, and `"+` / `"*` for the system clipboard. Each yank and delete also goes to the system clipboard.
+- `o` and `O` on a list item start a new item.
 - Marks (`m`) and macros (`q`, `@`).
 - Commands: `:w`, `:w FILE`, `:q`, `:q!`, `:wq`, `:x`, `:e FILE`, `:noh`, `:N`, and `:s` with ranges and the flags `g`, `i`, `I`, and `c`.
+
+The patterns of `/` and `:s` use the Go syntax: `(`, `)`, `|`, `+`, `?`, and `{` are special characters. `:s` also accepts the vim forms `\(`, `\)`, `\|`, `\<`, and `\>`. In the replacement, `\1`–`\9` and `&` insert the groups and the match.
+
+Vim mode does not have visual block mode or `ctrl+o` in insert mode.
 
 ## Pictures
 
@@ -124,7 +131,7 @@ mded shows pictures in terminals with the kitty graphics protocol: kitty and Gho
 - A picture shows at its natural size. If it is too large, mded makes it smaller to fit the width of the pane and `image_max_rows`.
 - A picture alone on its line replaces the line. A picture in a line of text shows below the line.
 - In edit mode, the line with the cursor shows its source, and its pictures do not show.
-- Without picture support, mded shows `🖼` and the alt text.
+- Without picture support, mded shows `🖼` and the alt text, or the file name if the alt text is empty.
 
 ## Sidebar
 
@@ -133,14 +140,16 @@ mded shows pictures in terminals with the kitty graphics protocol: kitty and Gho
 | Key | Action |
 |---|---|
 | `↑`, `↓` | Move. |
-| `→`, `enter` | Expand a directory, or open a file. |
-| `←` | Collapse a directory, or go to the parent directory. |
-| `/` | Filter the names. `esc` removes the filter. |
+| `→`, `enter` | Expand a directory, or open a file. On an expanded directory, go to its first entry. |
+| `←` | Collapse a directory, or go to the parent entry. On the top row, show the parent directory. |
+| `/` | Filter the names in the full tree. `enter` keeps the filter, and `esc` removes it. |
 | `ctrl+n` | Make a new file. |
 | `ctrl+shift+n` | Make a new directory. |
 | `F2` | Rename. |
 | `delete` | Delete. mded asks first. |
 | `ctrl+h` | Show or hide hidden files. |
+
+`alt+h` and `ctrl+w w` also show a hidden sidebar.
 
 The sidebar shows all files. Markdown files open formatted. Other text files open as plain text. Picture files show the picture. mded does not open other binary files.
 
@@ -169,8 +178,8 @@ The config file is `~/.config/mded/config.toml`. All keys are optional.
 ## Mouse
 
 - The wheel scrolls the pane under the mouse.
-- In view mode, a click on a checkbox changes it, and a click on a link follows it. A double-click edits the line.
-- In edit mode, a click puts the cursor, and a drag selects text.
+- In view mode, a click on a checkbox changes it, and a click on a link follows it. A double-click edits the line. A double-click on a checkbox does not change it.
+- In edit mode, a click puts the cursor, and a drag selects text. In vim mode, a drag starts visual mode.
 - In the sidebar, a click selects and a double-click opens.
 
 ## Credits
