@@ -426,3 +426,30 @@ func TestTableShrink(t *testing.T) {
 		t.Errorf("source rows = %d", len(rows))
 	}
 }
+
+// Inline markdown inside bold, italic, strike, and link text renders too, and a link in
+// bold text is an item.
+func TestNestedInline(t *testing.T) {
+	for src, want := range map[string]string{
+		"**Search with `/`**, as in":  "Search with /, as in",
+		"*see `x` here*":              "see x here",
+		"~~old **bold**~~":            "old bold",
+		"[**bold** link](u)":          "bold link",
+		"**a [link](http://x) here**": "a link here",
+	} {
+		cells, _ := PreviewCells(src)
+		if got := text(cells); got != want {
+			t.Errorf("%q: got %q, want %q", src, got, want)
+		}
+	}
+	cells, _ := PreviewCells("**Search with `/`**")
+	for _, c := range cells {
+		if c.R == '/' && c.Src != 15 {
+			t.Errorf("/ src = %d", c.Src)
+		}
+	}
+	items := Items([][]rune{[]rune("**a [link](http://x) here**")})
+	if len(items) != 1 || items[0].URL != "http://x" {
+		t.Errorf("items %+v", items)
+	}
+}

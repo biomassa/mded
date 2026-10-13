@@ -7,6 +7,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Fixed
+
+- Inline markdown in bold, italic, strikethrough, and link text shows formatted. Before, `**Search with `/`**` showed the backticks.
+
 ## [0.1.1] - 2026-10-13
 
 ### Added

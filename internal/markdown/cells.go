@@ -96,6 +96,12 @@ func inlineCells(s string, offset int, base lipgloss.Style, spans *[]span) []Cel
 			out = append(out, Cell{rs[i], st, offset + i})
 		}
 	}
+	// inner renders the text of a span with its own inline markdown, for example code in
+	// bold text. sp gets the links in it. The text of a link gives no items (sp is nil),
+	// because the link itself is the item.
+	inner := func(a, b int, st lipgloss.Style, sp *[]span) {
+		out = append(out, inlineCells(string(rs[a:b]), offset+a, st, sp)...)
+	}
 	add := func(kind ItemKind, a, b int, url string) {
 		if spans != nil {
 			*spans = append(*spans, span{kind, offset + a, offset + b, url})
@@ -109,9 +115,9 @@ func inlineCells(s string, offset int, base lipgloss.Style, spans *[]span) []Cel
 		case tok[0] == '`':
 			part(a+1, b-1, base.Foreground(theme.C(theme.Code)))
 		case strings.HasPrefix(tok, "**") || strings.HasPrefix(tok, "__"):
-			part(a+2, b-2, base.Bold(true))
+			inner(a+2, b-2, base.Bold(true), spans)
 		case strings.HasPrefix(tok, "~~"):
-			part(a+2, b-2, base.Strikethrough(true))
+			inner(a+2, b-2, base.Strikethrough(true), spans)
 		case strings.HasPrefix(tok, "!["):
 			// An image reference shows as "🖼 alt" in the link style, with no hyperlink. The
 			// variation selector U+FE0F makes the glyph two cells wide in all terminals, and two
@@ -130,13 +136,13 @@ func inlineCells(s string, offset int, base lipgloss.Style, spans *[]span) []Cel
 			close := strings.Index(tok, "](")
 			text := utf8.RuneCountInString(tok[1:close])
 			url := tok[close+2 : len(tok)-1]
-			part(a+1, a+1+text, base.Foreground(theme.C(theme.Link)).Underline(true).Hyperlink(url))
 			add(Link, a, b, url)
+			inner(a+1, a+1+text, base.Foreground(theme.C(theme.Link)).Underline(true).Hyperlink(url), nil)
 		case strings.HasPrefix(tok, "http"):
 			part(a, b, base.Foreground(theme.C(theme.Link)).Underline(true).Hyperlink(tok))
 			add(Link, a, b, tok)
 		default: // *italic* or _italic_
-			part(a+1, b-1, base.Italic(true))
+			inner(a+1, b-1, base.Italic(true), spans)
 		}
 		at = b
 	}
