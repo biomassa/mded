@@ -482,6 +482,9 @@ func (m *Model) load(path string) (*doc, bool) {
 
 // setDoc shows d in view mode.
 func (m *Model) setDoc(d *doc) {
+	if m.mode == modeEdit && m.km != nil && m.doc != d {
+		m.km.Reset() // ends the session in the old buffer and removes the mark hook from it
+	}
 	m.doc = d
 	m.mode = modeView
 	m.find, m.search = nil, nil

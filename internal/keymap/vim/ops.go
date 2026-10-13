@@ -241,9 +241,7 @@ func (v *Vim) openLine(above bool, n int) {
 	b := v.b
 	prefix := b.OpenPrefix(b.Row, above) // a list item continues the list
 	if above {
-		b.Home()
-		b.SplitLine()
-		b.Row--
+		b.InsertLines(b.Row, "") // the marks of the cursor line go down with it
 	} else {
 		b.End()
 		b.SplitLine()
@@ -288,14 +286,13 @@ func (v *Vim) operator(c cmd) {
 			return
 		}
 		rg = region{r1: b.Row, r2: r2, linewise: true}
+	case c.obj && c.name[1] == 's':
+		rg = v.sentenceRegion(v.sentenceObj(c.name[0] == 'i', n, false, pos{}), c.op)
 	case c.obj:
 		var ok bool
 		if rg, ok = v.object(c.name, n); !ok {
 			v.fail()
 			return
-		}
-		if c.name[1] == 's' {
-			rg = v.sentenceRegion(rg)
 		}
 	default:
 		var m mres
@@ -512,6 +509,10 @@ func (v *Vim) selectObject(c cmd, n int) {
 	b := v.b
 	if !v.visual() {
 		v.fail()
+		return
+	}
+	if c.name[1] == 's' {
+		v.selectSentence(c.name[0] == 'i', n)
 		return
 	}
 	rg, ok := v.object(c.name, n)
@@ -788,4 +789,18 @@ func (v *Vim) playMacro(r rune, n int) {
 			v.feed(k)
 		}
 	}
+}
+
+// selectSentence selects is or as in visual mode. A selection of more than one char gets
+// longer, as in vim. Otherwise the selection is the object.
+func (v *Vim) selectSentence(inner bool, n int) {
+	b := v.b
+	anchor := pos{b.SelRow, b.SelCol}
+	r := v.sentenceObj(inner, n, true, anchor)
+	if !r.extend {
+		b.SelRow, b.SelCol = r.start.row, r.start.col
+	}
+	b.Row, b.Col, b.Want = r.end.row, r.end.col, -1
+	v.mode = modeVisual
+	b.SelLinewise, b.SelInclusive = false, true
 }

@@ -15,6 +15,7 @@ const undoLimit = 200
 type state struct {
 	lines    [][]rune
 	row, col int
+	aux      any // the value of OnSnap at the time of the snapshot
 }
 
 // Buffer is the text of one document with its cursor, selection, undo, and search state.
@@ -35,8 +36,16 @@ type Buffer struct {
 	Search Search // shared by view mode, conventional edit, and vim
 
 	// OnShift, if set, is called when an edit adds or removes whole lines. The vim engine
-	// uses it to keep its marks on the right lines. Undo and redo do not call it.
+	// uses it to keep its marks on the right lines. Undo and redo call it too: they report the
+	// lines that are different at the start and at the end of the text as one removal and
+	// one insert.
 	OnShift func(Shift)
+
+	// OnSnap and OnRestore are for data that goes with the undo steps. If OnSnap is set, each
+	// snapshot keeps its value. Undo and redo give the value of the step to OnRestore after
+	// the lines are back. The vim engine keeps the named marks in it, as vim does.
+	OnSnap    func() any
+	OnRestore func(any)
 
 	undo, redo []state
 	typing     bool  // the last change was typing, so the next letter joins its undo step

@@ -6,9 +6,11 @@
 // marks, the macros, the last change for the dot command, and the text of the : and / prompts.
 // The buffer keeps the document state.
 //
-// Marks follow the lines: the buffer reports each edit that adds or removes lines, and the
-// engine moves its marks (see shiftMarks). Undo and redo do not move marks. A mark that is out
-// of the text is limited to it.
+// Marks follow the lines: the buffer reports each edit that adds or removes lines (an undo and
+// a redo too), and the engine moves its marks (see shiftMarks). The engine installs the hook
+// in the buffer at the first key or paste for that buffer, so that edits of the UI between
+// the keys move the marks too. Reset removes the hook. A mark that is out of the text is
+// limited to it.
 package vim
 
 import (
@@ -184,8 +186,8 @@ func (v *Vim) fail() { v.failed = true }
 
 // Handle processes one key.
 func (v *Vim) Handle(b *buffer.Buffer, k keymap.Key, width, pageRows int) []keymap.Effect {
-	v.b, v.w, v.rows = b, max(1, width), max(1, pageRows)
-	b.OnShift = v.shiftMarks
+	v.attach(b)
+	v.w, v.rows = max(1, width), max(1, pageRows)
 	rev := b.Rev
 	v.fx = nil
 	v.macroKeys = 0
@@ -194,9 +196,23 @@ func (v *Vim) Handle(b *buffer.Buffer, k keymap.Key, width, pageRows int) []keym
 	return v.finish(rev)
 }
 
+// attach makes b the buffer of the engine and installs the mark hook in it. The hook of
+// the buffer that the engine had before goes away.
+func (v *Vim) attach(b *buffer.Buffer) {
+	if v.b != nil && v.b != b {
+		v.unhook(v.b)
+	}
+	v.b = b
+	b.OnShift, b.OnSnap, b.OnRestore = v.shiftMarks, v.snapMarks, v.restoreMarks
+}
+
+// unhook removes the hooks of the engine from b.
+func (v *Vim) unhook(b *buffer.Buffer) {
+	b.OnShift, b.OnSnap, b.OnRestore = nil, nil, nil
+}
+
 // finish keeps the search matches current and adds the Changed effect.
 func (v *Vim) finish(rev int) []keymap.Effect {
-	v.b.OnShift = nil
 	if v.b.Rev != rev {
 		v.b.Refresh()
 		v.fx = append(v.fx, keymap.Changed())
@@ -264,11 +280,12 @@ func (v *Vim) abort() {
 }
 
 // Reset returns to normal mode and drops the pending state. It keeps registers, marks, and
-// macros. It ends an open insert session in the buffer of the last Handle call.
+// macros. It ends an open insert session in the buffer of the last Handle call. It removes
+// the mark hook from that buffer.
 func (v *Vim) Reset() {
 	if v.b != nil {
-		v.b.OnShift = v.shiftMarks
-		defer func() { v.b.OnShift = nil }()
+		v.attach(v.b) // the end of an insert session can change lines
+		defer v.unhook(v.b)
 	}
 	v.abort()
 	v.recReg, v.rec = 0, nil
@@ -333,8 +350,7 @@ func (v *Vim) fixCursor() {
 
 // Paste inserts text that comes from the terminal or from the system clipboard.
 func (v *Vim) Paste(b *buffer.Buffer, text string) []keymap.Effect {
-	v.b = b
-	b.OnShift = v.shiftMarks
+	v.attach(b)
 	rev := b.Rev
 	v.fx = nil
 	b.Clamp()

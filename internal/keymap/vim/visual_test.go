@@ -84,6 +84,36 @@ func TestVisualDot(t *testing.T) {
 		{"v with register", "abcdef", 0, 0, "vl\"ad.", "ef", 0, 0},
 		{"X in v", "a\nb\nc\nd\ne\nf", 0, 0, "vjX.", "e\nf", 0, 0},
 		{"dot twice", "abcdefghij", 0, 0, "vld..", "ghij", 0, 0},
+		// Display columns: a tab goes to the next multiple of 8, a wide rune takes 2 columns.
+		{"v d tab span", "a\tb\tc\td\te\tf", 0, 0, "vld.", "c\td\te\tf", 0, 0},
+		{"v d tab span from tab", "a\tb\tc\td\te\tf", 0, 1, "vld.", "ad\te\tf", 0, 1},
+		{"v d tab two chars", "a\tb\tc\td\te\tf", 0, 0, "vlld.", "d\te\tf", 0, 0},
+		{"v d tab end of selection", "ab\tcdef\tghijklmnopq", 0, 1, "vlld.", "ahijklmnopq", 0, 1},
+		{"v d tab dot after tab", "ab\tcdef\tghijklmnopq", 0, 3, "vlld.", "ab\tghijklmnopq", 0, 3},
+		{"v d tab dot mid line", "abcdefghijkl\tmnopqrst", 0, 0, "vllllllld.", "mnopqrst", 0, 0},
+		{"v c tab", "a\tb\tc\td\te\tf\tg\th", 0, 0, "vlcX<esc>.", "Xc\td\te\tf\tg\th", 0, 0},
+		{"v c tab three", "a\tb\tc\td\te\tf\tg\th", 0, 0, "vlllcX<esc>.", "Xe\tf\tg\th", 0, 0},
+		{"v d tab leading", "\tab\tcd\tefghijkl", 0, 0, "vld.", "d\tefghijkl", 0, 0},
+		{"v d tab leading indent", "        ab\tc\t\t\td", 0, 0, "vlld.", "  ab\tc\t\t\td", 0, 0},
+		{"v d wide", "中文字符abc中文字符defghijkl", 0, 0, "vld.", "abc中文字符defghijkl", 0, 0},
+		{"v d wide from second", "中文字符abc中文字符defghijkl", 0, 1, "vld.", "中c中文字符defghijkl", 0, 1},
+		{"v d wide single", "中文字符abc中文字符defghijkl", 0, 1, "vd.", "中符abc中文字符defghijkl", 0, 1},
+		{"v d wide ascii span", "中文字符abc中文字符defghijkl", 0, 0, "vlllld.", "defghijkl", 0, 0},
+		{"v d wide mixed", "a中b文c字d中中中中efgh", 0, 0, "vlld.", "d中中中中efgh", 0, 0},
+		{"v d wide mixed from wide", "a中b文c字d中中中中efgh", 0, 1, "vlld.", "a中中中efgh", 0, 1},
+		{"v d wide tab mixed", "中a\tb中c\td中e\tfghijklmnop", 0, 0, "vlllld.", "e\tfghijklmnop", 0, 0},
+		{"v x wide", "中文字符abc中文字符defghijkl", 0, 0, "vlx.", "abc中文字符defghijkl", 0, 0},
+		{"v c wide", "中文字符abc中文字符defghijkl", 0, 1, "vlcX<esc>.", "中Xbc中文字符defghijkl", 0, 1},
+		{"v d across lines tab last line", "abcdefghijkl\nxyz\tw\tq\tmmmmmmm\nabcdefghijkl\nmn中op", 0, 0, "vjllld.", "ijkl\nmn中op", 0, 0},
+		{"v d across lines tab end col", "abcdefghijkl\nxyz\tw\tq\tmmmmmmm\nabcdefghijkl\nmn中op", 0, 0, "vjllllld.", "mn中op", 0, 0},
+		{"v d across lines tab first col", "abcdefghijkl\nxyz\tw\tq\tmmmmmmm\nabcdefghijkl\nmn中op", 0, 0, "vjlllld.", "jkl\nmn中op", 0, 0},
+		{"v d across lines wide", "abcdefghijkl\n中a中b中c中d中e中f\nabcdefghijklmnopq\nmn中op", 0, 0, "vjlld.", "fghijklmnopq\nmn中op", 0, 0},
+		{"v d across lines wide odd", "abcdefghijkl\n中a中b中c中d中e中f\nabcdefghijklmnopq\nmn中op", 0, 0, "vjllld.", "ghijklmnopq\nmn中op", 0, 0},
+		{"v d across lines wide end", "abcdefghijkl\n中a中b中c中d中e中f\nabcdefghijklmnopq\nmn中op", 0, 0, "vjllllld.", "jklmnopq\nmn中op", 0, 0},
+		{"v d across lines tab line two", "abcdefghijklmnop\nab\tcd\tef\tgh\nabcdefghijklmnop\nxyz", 0, 0, "vjllllld.", "\nxyz", 0, 0},
+		{"v d across lines tab line two b", "abcdefghijklmnop\nab\tcd\tef\tgh\nabcdefghijklmnop\nxyz", 0, 0, "vjlllllld.", "xyz", 0, 0},
+		{"v d across lines tab line two c", "abcdefghijklmnop\n\tab\tcd\tef\tgh\nabcdefghijklmnopqrstuvwxyz\nxyz", 0, 0, "vjlld.", "klmnopqrstuvwxyz\nxyz", 0, 0},
+		{"v d across lines tab line two d", "abcdefghijklmnop\n\tab\tcd\tef\tgh\nabcdefghijklmnopqrstuvwxyz\nxyz", 0, 0, "vjllld.", "qrstuvwxyz\nxyz", 0, 0},
 	})
 }
 
@@ -216,6 +246,40 @@ func TestSentenceObjects(t *testing.T) {
 		{"as at second sentence line", "A b.\nC d. E.", 1, 1, "das", "A b.\nE.", 1, 0},
 		{"2as over line end", "A b.\nC d. E.", 0, 1, "d2as", "E.", 0, 0},
 		{"yank as paste", "One. Two.", 0, 6, "yas$p", "One. Two. Two.", 0, 13},
+		{"is first of two empty lines", "a.\n\n\nb.", 1, 0, "dis", "a.\n\nb.", 2, 0},
+		{"is second of two empty lines", "a.\n\n\nb.", 2, 0, "dis", "a.\n\nb.", 2, 0},
+		{"as first of two empty lines", "a.\n\n\nb.", 1, 0, "das", "a.\n\nb.", 2, 0},
+		{"2is first of two empty lines", "a.\n\n\nb.", 1, 0, "d2is", "a.\n\nb.", 2, 0},
+		{"3is first of three empty lines", "a.\n\n\n\nb.", 1, 0, "d3is", "a.\n\n", 2, 0},
+		{"is first of three empty lines", "a.\n\n\n\nb.", 1, 0, "dis", "a.\n\n\nb.", 3, 0},
+		{"is middle of three empty lines", "a.\n\n\n\nb.", 2, 0, "dis", "a.\n\n\nb.", 3, 0},
+		{"is last of three empty lines", "a.\n\n\n\nb.", 3, 0, "dis", "a.\n\n\nb.", 3, 0},
+		{"visual is first of two empty lines", "a.\n\n\nb.", 1, 0, "visd", "a.\nb.", 1, 0},
+		{"visual is first of three empty lines", "a.\n\n\n\nb.", 1, 0, "visd", "a\n\nb.", 0, 0},
+		{"visual as first of two empty lines", "a.\n\n\nb.", 1, 0, "vasd", "a.\nb.", 1, 0},
+		{"is first of two empty lines at start", "\n\n\nb.", 0, 0, "dis", "\n\nb.", 2, 0},
+		{"is second of two empty lines at start", "\n\n\nb.", 1, 0, "dis", "\n\nb.", 2, 0},
+		{"visual is empty lines at start", "\n\n\nb.", 0, 0, "visd", "b.", 0, 0},
+		{"2is empty lines at start", "\n\n\nb.", 0, 0, "d2is", "\n\nb.", 2, 0},
+		{"is empty lines at end", "a.\n\n\n", 1, 0, "dis", "\n\n", 0, 0},
+		{"is two empty lines then text", "a b.\n\n\nc d.", 1, 0, "dis", "a b.\n\nc d.", 2, 0},
+		{"is two empty lines then indent", "a.\n\n\n  b.", 1, 0, "dis", "a.\n\n  b.", 2, 2},
+		{"as two empty lines then indent", "a.\n\n\n  b.", 1, 0, "das", "a.\n\nb.", 2, 0},
+		{"is indent after empty lines", "a.\n\n\n  b.", 3, 0, "dis", "a.\n\n\n  ", 3, 1},
+		{"is at text start with indent", "  a. b.", 0, 0, "dis", " b.", 0, 0},
+		{"is on indent at text start", "  a. b.", 0, 1, "dis", " b.", 0, 0},
+		{"as at text start with indent", "  a. b.", 0, 0, "das", "b.", 0, 0},
+		{"as at text start with indent in sentence", "  a. b.", 0, 3, "das", "b.", 0, 0},
+		{"is at text start two lines", "  a.\n  b.", 0, 0, "dis", "  b.", 0, 2},
+		{"as at text start two lines", "  a.\n  b.", 0, 0, "das", "b.", 0, 0},
+		{"visual is at text start with indent", "  a. b.", 0, 0, "visd", " b.", 0, 0},
+		{"visual as at text start with indent", "  a. b.", 0, 2, "vasd", "b.", 0, 0},
+		{"is after one empty line at start", "\n  a.", 0, 0, "dis", "  a.", 0, 2},
+		{"as after one empty line at start", "\n  a.", 0, 0, "das", "a.", 0, 0},
+		{"as after two empty lines at start", "\n\n  a. b.", 1, 0, "das", "\na. b.", 1, 0},
+		{"is on indent after empty line at start", "\n\n  a. b.", 2, 0, "dis", "\n\n   b.", 2, 2},
+		{"2is indent at start", "  a. b.", 0, 0, "d2is", "b.", 0, 0},
+		{"3is indent at start", "  a. b.", 0, 0, "d3is", "", 0, 0},
 	})
 }
 
@@ -282,6 +346,66 @@ func TestMarksMove(t *testing.T) {
 	}
 }
 
+// TestMarksUndo checks that undo and redo move the marks as vim does. Marks a and b are the
+// lines after the keys, or -1 if the mark is gone. Vim also brings back the marks that a
+// change deleted or moved, when undo or redo goes over that change.
+func TestMarksUndo(t *testing.T) {
+	tests := []struct {
+		name, text, script, want string
+		a, b                     int
+	}{
+		{"undo dd above mark", "a\nb\nc\nd\ne", "jjmaggddu", "a\nb\nc\nd\ne", 2, -1},
+		{"redo dd above mark", "a\nb\nc\nd\ne", "jjmaggddu<c-r>", "b\nc\nd\ne", 1, -1},
+		{"undo 2dd above mark", "a\nb\nc\nd\ne", "jjmagg2ddu", "a\nb\nc\nd\ne", 2, -1},
+		{"redo 2dd above mark", "a\nb\nc\nd\ne", "jjmagg2ddu<c-r>", "c\nd\ne", 0, -1},
+		{"undo O above mark", "a\nb\nc\nd\ne", "jjmaggOx<esc>u", "a\nb\nc\nd\ne", 2, -1},
+		{"redo O above mark", "a\nb\nc\nd\ne", "jjmaggOx<esc>u<c-r>", "x\na\nb\nc\nd\ne", 3, -1},
+		{"O on marked line", "a\nb\nc\nd\ne", "jjmaOx<esc>", "a\nb\nx\nc\nd\ne", 3, -1},
+		{"undo O on marked line", "a\nb\nc\nd\ne", "jjmaOx<esc>u", "a\nb\nc\nd\ne", 2, -1},
+		{"redo O on marked line", "a\nb\nc\nd\ne", "jjmaOx<esc>u<c-r>", "a\nb\nx\nc\nd\ne", 3, -1},
+		{"o below mark", "a\nb\nc\nd\ne", "jjmaox<esc>", "a\nb\nc\nx\nd\ne", 2, -1},
+		{"undo o below mark", "a\nb\nc\nd\ne", "jjmaox<esc>u", "a\nb\nc\nd\ne", 2, -1},
+		{"undo dd of marked line", "a\nb\nc\nd\ne", "jmaddu", "a\nb\nc\nd\ne", 1, -1},
+		{"redo dd of marked line", "a\nb\nc\nd\ne", "jmaddu<c-r>", "a\nc\nd\ne", -1, -1},
+		{"undo dd below mark", "a\nb\nc\nd\ne", "jmajddu", "a\nb\nc\nd\ne", 1, -1},
+		{"redo dd below mark", "a\nb\nc\nd\ne", "jmajddu<c-r>", "a\nb\nd\ne", 1, -1},
+		{"undo J above mark", "a\nb\nc\nd\ne", "jjmaggJu", "a\nb\nc\nd\ne", 2, -1},
+		{"redo J above mark", "a\nb\nc\nd\ne", "jjmaggJu<c-r>", "a b\nc\nd\ne", 1, -1},
+		{"undo 3J over mark", "a\nb\nc\nd\ne", "jjmagg3Ju", "a\nb\nc\nd\ne", 2, -1},
+		{"redo 3J over mark", "a\nb\nc\nd\ne", "jjmagg3Ju<c-r>", "a b c\nd\ne", 0, -1},
+		{"undo p above mark", "a\nb\nc\nd\ne", "jjmaggyyPu", "a\nb\nc\nd\ne", 2, -1},
+		{"redo p above mark", "a\nb\nc\nd\ne", "jjmaggyyPu<c-r>", "a\na\nb\nc\nd\ne", 3, -1},
+		{"undo Vjd over mark", "a\nb\nc\nd\ne", "jjmaggVjdu", "a\nb\nc\nd\ne", 2, -1},
+		{"redo Vjd over mark", "a\nb\nc\nd\ne", "jjmaggVjdu<c-r>", "c\nd\ne", 0, -1},
+		{"undo dG over mark", "a\nb\nc\nd\ne", "jjmaggdGu", "a\nb\nc\nd\ne", 2, -1},
+		{"undo x keeps mark", "a\nb\nc\nd\ne", "jjmaggxu", "a\nb\nc\nd\ne", 2, -1},
+		{"undo O below mark keeps mark", "a\nb\nc\nd\ne", "jjmaGOx<esc>u", "a\nb\nc\nd\ne", 2, -1},
+		{"undo O deletes mark on new line", "a\nb\nc\nd\ne", "jjmaggOx<esc>mbu", "a\nb\nc\nd\ne", 2, -1},
+		{"redo O brings back mark on new line", "a\nb\nc\nd\ne", "jjmaggOx<esc>mbu<c-r>", "x\na\nb\nc\nd\ne", 3, 0},
+		{"undo dd two marks", "a\nb\nc\nd\ne", "jmajmbggddu", "a\nb\nc\nd\ne", 1, 2},
+		{"redo dd two marks", "a\nb\nc\nd\ne", "jmajmbggddu<c-r>", "b\nc\nd\ne", 0, 1},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			b := buffer.New(tc.text)
+			v := New(4)
+			run(v, b, tc.script)
+			if got := b.Text(); got != tc.want {
+				t.Errorf("text = %q, want %q", got, tc.want)
+			}
+			for name, want := range map[rune]int{'a': tc.a, 'b': tc.b} {
+				got := -1
+				if p, ok := v.marks[name]; ok {
+					got = p.row
+				}
+				if got != want {
+					t.Errorf("mark %c on line %d, want %d", name, got, want)
+				}
+			}
+		})
+	}
+}
+
 // TestVisualPutClipboard checks that the replaced text goes to the system clipboard for p,
 // and that P leaves registers and clipboard alone.
 func TestVisualPutClipboard(t *testing.T) {
@@ -335,17 +459,42 @@ func TestVisualPutSystemClipboard(t *testing.T) {
 	}
 }
 
-// TestMarkHookReleased checks that the engine leaves no callback in the buffer.
-func TestMarkHookReleased(t *testing.T) {
-	b := buffer.New("a\nb")
+// TestMarkHook checks the life of the hooks in the buffer: they are in it after the first
+// key, so that an edit of the UI between the keys moves the marks. Reset and a new buffer
+// take them out.
+func TestMarkHook(t *testing.T) {
+	b := buffer.New("a\nb\nc")
 	v := New(4)
-	run(v, b, "ma")
 	if b.OnShift != nil {
-		t.Error("OnShift stays set after Handle")
+		t.Fatal("hook set before the first key")
+	}
+	run(v, b, "jma")
+	if b.OnShift == nil || b.OnSnap == nil || b.OnRestore == nil {
+		t.Fatal("hooks not set after Handle")
+	}
+	b.InsertLines(0, "x") // an edit that the UI makes
+	if got := v.marks['a'].row; got != 2 {
+		t.Errorf("mark a on line %d after a line insert, want 2", got)
+	}
+	b.DeleteLines(0, 0)
+	if got := v.marks['a'].row; got != 1 {
+		t.Errorf("mark a on line %d after a line delete, want 1", got)
+	}
+	b2 := buffer.New("p\nq")
+	run(v, b2, "l")
+	if b.OnShift != nil || b.OnSnap != nil || b.OnRestore != nil {
+		t.Error("the old buffer keeps the hooks")
+	}
+	if b2.OnShift == nil {
+		t.Error("the new buffer has no hook")
 	}
 	v.Reset()
-	if b.OnShift != nil {
-		t.Error("OnShift stays set after Reset")
+	if b2.OnShift != nil || b2.OnSnap != nil || b2.OnRestore != nil {
+		t.Error("hooks stay set after Reset")
+	}
+	v.Paste(b, "z\ny")
+	if b.OnShift == nil {
+		t.Error("hook not set after Paste")
 	}
 }
 

@@ -310,3 +310,55 @@ func TestImagePathPercentDecoding(t *testing.T) {
 		}
 	}
 }
+
+// TestPickerVimMarks checks that the line of the image inserter moves the vim marks, and that
+// the vim hooks leave the buffer with the vim keymap.
+func TestPickerVimMarks(t *testing.T) {
+	_, md := pickerFixture(t)
+	m := newVimModel(t, md)
+	press(m, "e", "j", "m", "a", "k", "ctrl+p")
+	if m.img == nil {
+		t.Fatal("picker not open")
+	}
+	for i := 0; i < 8; i++ {
+		press(m, "down")
+	}
+	press(m, "enter", "enter")
+	b := m.doc.buf
+	if b.OnShift == nil {
+		t.Error("the hook is not in the buffer during the vim session")
+	}
+	press(m, "G", "'", "a")
+	if b.Row != 2 || string(b.Lines[2]) != "two" {
+		t.Errorf("mark a: row %d in %q", b.Row, b.Text())
+	}
+	press(m, "ctrl+g") // conventional flavor
+	if b.OnShift != nil || b.OnSnap != nil || b.OnRestore != nil {
+		t.Error("the vim hooks stay in the buffer after the flavor switch")
+	}
+	press(m, "ctrl+g") // vim again
+	press(m, "x")
+	if b.OnShift == nil {
+		t.Error("the hook is not back after the switch to vim")
+	}
+	press(m, "esc") // view mode
+	if b.OnShift != nil {
+		t.Error("the hook stays in the buffer in view mode")
+	}
+}
+
+// TestVimHookLeavesOldDoc checks that a new document in edit mode takes the vim hooks from
+// the buffer of the old document.
+func TestVimHookLeavesOldDoc(t *testing.T) {
+	_, md := pickerFixture(t)
+	m := newVimModel(t, md)
+	press(m, "e", "x")
+	old := m.doc.buf
+	if old.OnShift == nil {
+		t.Fatal("no hook in edit mode")
+	}
+	m.setDoc(blankDoc())
+	if old.OnShift != nil || old.OnSnap != nil || old.OnRestore != nil {
+		t.Error("the old buffer keeps the vim hooks")
+	}
+}

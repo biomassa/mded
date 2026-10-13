@@ -1,5 +1,7 @@
 package buffer
 
+import "slices"
+
 // Two undo policies share one set of stacks.
 //
 // Conventional: the edit code calls PushUndo before a change. Consecutive typed letters
@@ -12,7 +14,11 @@ package buffer
 
 // snap copies the lines. The line slices are shared, because lines are immutable.
 func (b *Buffer) snap() state {
-	return state{append([][]rune(nil), b.Lines...), b.Row, b.Col}
+	st := state{lines: append([][]rune(nil), b.Lines...), row: b.Row, col: b.Col}
+	if b.OnSnap != nil {
+		st.aux = b.OnSnap()
+	}
+	return st
 }
 
 func (b *Buffer) pushState(s state) {
@@ -63,9 +69,39 @@ func (b *Buffer) EndChange() {
 // InChange reports whether a BeginChange group is open.
 func (b *Buffer) InChange() bool { return b.depth > 0 }
 
-// restore puts a saved state in the buffer.
+// shiftDiff tells the OnShift function how a change from the lines old to the lines now
+// moves the lines. The lines that stay at the start and at the end are the same. The lines
+// between them are replaced. If the replaced part has a new size, the old lines go away and
+// the new lines come in, as in vim: the marks on the old lines are deleted, and the marks
+// after them move.
+func (b *Buffer) shiftDiff(old, now [][]rune) {
+	if b.OnShift == nil || len(old) == len(now) {
+		return
+	}
+	p := 0
+	for p < len(old) && p < len(now) && slices.Equal(old[p], now[p]) {
+		p++
+	}
+	s := 0
+	for s < len(old)-p && s < len(now)-p && slices.Equal(old[len(old)-1-s], now[len(now)-1-s]) {
+		s++
+	}
+	if gone := len(old) - p - s; gone > 0 {
+		b.shift(Shift{At: p, N: -gone})
+	}
+	if came := len(now) - p - s; came > 0 {
+		b.shift(Shift{At: p, N: came})
+	}
+}
+
+// restore puts a saved state in the buffer. It reports the line shifts of the change.
 func (b *Buffer) restore(s state) {
+	old := b.Lines
 	b.Lines, b.Row, b.Col = s.lines, s.row, s.col
+	b.shiftDiff(old, s.lines)
+	if b.OnRestore != nil && s.aux != nil {
+		b.OnRestore(s.aux)
+	}
 	b.Want, b.SelOn, b.typing = -1, false, false
 	b.touch()
 	b.Clamp()

@@ -1,6 +1,8 @@
 package vim
 
 import (
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/biomassa/mded/internal/buffer"
 	"github.com/biomassa/mded/internal/keymap"
 )
@@ -10,8 +12,47 @@ import (
 type visRep struct {
 	linewise bool
 	lines    int  // number of lines
-	cols     int  // charwise: one line: number of chars. More lines: column of the last char.
+	cols     int  // charwise: display columns. One line: the width of the selection. More lines: the last display column of the last char.
 	eol      bool // charwise: the selection goes to the end of the last line ($)
+}
+
+// vimTabstop is the width of a tab in the display columns of a visual span. It is the default
+// tabstop of vim. The tab width of the editor does not change it.
+const vimTabstop = 8
+
+// vcols returns the first display column of char i of line l, and the first column after it.
+// A tab goes to the next tabstop. A wide rune takes 2 columns. The line end (i at or after
+// len(l)) is one column wide.
+func vcols(l []rune, i int) (first, next int) {
+	v := 0
+	for k := 0; k < len(l) && k < i; k++ {
+		v = vnext(v, l[k])
+	}
+	if i >= len(l) {
+		return v, v + 1
+	}
+	return v, vnext(v, l[i])
+}
+
+// vnext returns the display column after rune r that starts at column v.
+func vnext(v int, r rune) int {
+	if r == '\t' {
+		return v + vimTabstop - v%vimTabstop
+	}
+	return v + ansi.StringWidth(string(r))
+}
+
+// vcolChar returns the index of the char that covers display column vc of line l. After the
+// last char it returns len(l), the line end.
+func vcolChar(l []rune, vc int) int {
+	v := 0
+	for i, r := range l {
+		v = vnext(v, r)
+		if vc < v {
+			return i
+		}
+	}
+	return len(l)
 }
 
 // selEnds returns the two ends of the selection in text order.
@@ -30,9 +71,11 @@ func (v *Vim) visInfo(linewise bool) *visRep {
 	r := &visRep{linewise: linewise, lines: e.row - a.row + 1}
 	if !linewise {
 		r.eol = v.b.Want >= wantEOL
-		r.cols = e.col
+		_, last := vcols(v.b.Lines[e.row], e.col)
+		r.cols = last - 1
 		if r.lines == 1 {
-			r.cols = e.col - a.col + 1
+			first, _ := vcols(v.b.Lines[a.row], a.col)
+			r.cols = last - first
 		}
 	}
 	return r
@@ -57,12 +100,18 @@ func (v *Vim) startVisRep(r *visRep) {
 	b.Want = -1
 	if !r.linewise {
 		v.mode = modeVisual
-		n := len(b.Lines[row])
-		col := r.cols
+		l := b.Lines[row]
+		n := len(l)
+		vc := r.cols
 		if r.lines == 1 {
-			col = b.Col + r.cols - 1
+			// The cursor column of a tab is its last column, as in vim in normal mode.
+			first, next := vcols(l, b.Col)
+			if b.Col < n && l[b.Col] == '\t' {
+				first = next - 1
+			}
+			vc = first + r.cols - 1
 		}
-		b.Col = max(0, min(col, n)) // as in vim, the end can be on the line break
+		b.Col = vcolChar(l, vc) // as in vim, the end can be on the line break
 		if r.eol {
 			b.Col, b.Want = n, wantEOL
 		}
@@ -204,5 +253,27 @@ func (v *Vim) shiftMarks(s buffer.Shift) {
 			p.row, p.col = s.At-1, max(0, p.col+s.Col)
 		}
 		v.marks[k] = p
+	}
+}
+
+// snapMarks returns a copy of the named marks for an undo step. In vim, undo and redo bring
+// back the named marks (a to z) that the step has, also a mark that the change deleted.
+func (v *Vim) snapMarks() any {
+	m := map[rune]pos{}
+	for k, p := range v.marks {
+		if k >= 'a' && k <= 'z' {
+			m[k] = p
+		}
+	}
+	return m
+}
+
+// restoreMarks puts back the named marks of an undo step. A mark that the step does not have
+// stays as it is.
+func (v *Vim) restoreMarks(a any) {
+	if m, ok := a.(map[rune]pos); ok {
+		for k, p := range m {
+			v.marks[k] = p
+		}
 	}
 }
