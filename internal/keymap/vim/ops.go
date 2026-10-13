@@ -227,6 +227,7 @@ func (v *Vim) replaceChars(c cmd, n int) {
 // openLine runs o and O: it opens a line and starts an insert session.
 func (v *Vim) openLine(above bool, n int) {
 	b := v.b
+	prefix := b.OpenPrefix(b.Row, above) // a list item continues the list
 	if above {
 		b.Home()
 		b.SplitLine()
@@ -236,12 +237,16 @@ func (v *Vim) openLine(above bool, n int) {
 		b.SplitLine()
 	}
 	b.Col = 0
+	b.Insert([]rune(prefix))
 	v.change = true
 	k := 'o'
 	if above {
 		k = 'O'
 	}
 	v.startInsert(k, n)
+	if prefix != "" { // a count repeats the prefix with the typed text
+		v.ins.keys = append(v.ins.keys, keymap.Key{Name: prefix, Text: prefix})
+	}
 }
 
 // startInsert opens an insert session. The undo step of the command stays open.
@@ -447,6 +452,32 @@ func (v *Vim) toggleVisual(m mode) {
 	}
 	v.mode = m
 	b.SelLinewise, b.SelInclusive = m == modeVLine, m == modeVisual
+}
+
+// StartVisual starts charwise visual mode with the anchor at row, col. The cursor stays where
+// it is. The UI calls it when the mouse drags. It does nothing in insert and replace mode.
+// A second call moves the anchor, so the UI can call it for each motion of the mouse.
+func (v *Vim) StartVisual(b *buffer.Buffer, row, col int) {
+	if v.mode == modeInsert || v.mode == modeReplace {
+		return
+	}
+	v.b = b
+	v.pending = nil
+	row = max(0, min(row, len(b.Lines)-1))
+	col = max(0, min(col, len(b.Lines[row])-1))
+	b.SelRow, b.SelCol, b.SelOn = row, col, true
+	b.SelLinewise, b.SelInclusive = false, true
+	v.mode = modeVisual
+	v.fixCursor()
+}
+
+// LeaveVisual leaves visual mode, if it is on. The UI calls it when the mouse clicks.
+func (v *Vim) LeaveVisual(b *buffer.Buffer) {
+	if !v.visual() {
+		return
+	}
+	v.b = b
+	v.exitVisual()
 }
 
 // exitVisual leaves visual mode and sets the marks < and >.

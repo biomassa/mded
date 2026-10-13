@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/biomassa/mded/internal/buffer"
 	"github.com/biomassa/mded/internal/config"
 	"github.com/biomassa/mded/internal/markdown"
 )
@@ -135,6 +136,21 @@ func (m *Model) posAt(x, y int) (line, col, src int, ok bool) {
 	return r.Line, min(col, n), src, true
 }
 
+// clickAct is what a click in view mode did. A double-click reads it, because its first click
+// already did the single-click action.
+type clickAct struct {
+	checkbox bool           // the click toggled a checkbox
+	link     bool           // the click followed a link
+	buf      *buffer.Buffer // the buffer of the toggle
+	rev      int            // the Rev of the buffer after the toggle
+}
+
+// mouseKeymap is the part of a keymap that handles the mouse. The vim engine has it.
+type mouseKeymap interface {
+	StartVisual(b *buffer.Buffer, row, col int)
+	LeaveVisual(b *buffer.Buffer)
+}
+
 // docClick handles a left click in the document pane.
 func (m *Model) docClick(x, y int, dbl bool) {
 	line, col, src, ok := m.posAt(x, y)
@@ -142,11 +158,16 @@ func (m *Model) docClick(x, y int, dbl bool) {
 		return
 	}
 	b := m.doc.buf
+	act := m.lastAct
+	m.lastAct = clickAct{}
 	if m.mode == modeEdit {
+		if mk, ok := m.km.(mouseKeymap); ok && m.vimFlavor {
+			mk.LeaveVisual(b)
+		}
 		b.MoveTo(line, col)
 		b.SelRow, b.SelCol, b.SelOn = line, col, false
 		b.BreakTyping()
-		m.dragSel = !m.vimFlavor
+		m.dragSel = true
 		m.follow = true
 		return
 	}
@@ -154,7 +175,17 @@ func (m *Model) docClick(x, y int, dbl bool) {
 		return
 	}
 	if dbl {
-		m.enterEdit(&[2]int{line, 0})
+		switch {
+		case act.link: // the first click followed the link
+		case act.checkbox:
+			// Undo the toggle of the first click: the text and the saved state come back.
+			if act.buf == b && act.rev == b.Rev {
+				b.DropUndo()
+			}
+			m.enterEdit(&[2]int{line, 0})
+		default:
+			m.enterEdit(&[2]int{line, 0})
+		}
 		return
 	}
 	if src < 0 {
@@ -165,7 +196,9 @@ func (m *Model) docClick(x, y int, dbl bool) {
 			m.itemSel = i
 			if it.Kind == markdown.Checkbox {
 				m.toggleItem(it)
+				m.lastAct = clickAct{checkbox: true, buf: b, rev: b.Rev}
 			} else {
+				m.lastAct = clickAct{link: true}
 				m.followLink(it.URL)
 			}
 			return
@@ -185,6 +218,14 @@ func (m *Model) mouseMotion(ms tea.Mouse) {
 		}
 		b := m.doc.buf
 		b.Row, b.Col, b.Want = line, col, -1
+		if mk, ok := m.km.(mouseKeymap); ok && m.vimFlavor { // vim: the drag starts visual mode
+			if line != b.SelRow || col != b.SelCol || b.SelOn {
+				mk.StartVisual(b, b.SelRow, b.SelCol)
+			}
+			b.BreakTyping()
+			m.follow = true
+			return
+		}
 		b.SelOn = line != b.SelRow || col != b.SelCol
 		b.BreakTyping()
 		m.follow = true

@@ -85,6 +85,19 @@ func (b *Buffer) Undo() bool {
 	return true
 }
 
+// DropUndo goes back one step like Undo, but it forgets the step: Redo cannot bring it back.
+// It reports whether it did.
+func (b *Buffer) DropUndo() bool {
+	n := len(b.undo)
+	if n == 0 || b.depth > 0 {
+		return false
+	}
+	s := b.undo[n-1]
+	b.undo = b.undo[:n-1]
+	b.restore(s)
+	return true
+}
+
 // Redo goes forward one step. It reports whether it did.
 func (b *Buffer) Redo() bool {
 	n := len(b.redo)

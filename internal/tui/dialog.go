@@ -205,7 +205,7 @@ func (m *Model) searchEnter() {
 func (m *Model) searchNext(reverse bool) {
 	b := m.doc.buf
 	if b.Search.Re == nil {
-		m.status("no search pattern", true)
+		m.status("no previous regular expression", true)
 		return
 	}
 	if !m.srchPos {

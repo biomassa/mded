@@ -310,3 +310,43 @@ func umask() os.FileMode {
 	syscallUmask(old)
 	return os.FileMode(old)
 }
+
+func TestEnterOnExpandedMovesToChild(t *testing.T) {
+	d := setup(t)
+	tr, _ := New(d, false)
+	if a := press(tr, "enter"); a.Kind != None || tr.current().name != "A_dir" {
+		t.Fatalf("root: %+v on %s", a, tr.current().name)
+	}
+	press(tr, "down", "right") // b_dir, expand
+	press(tr, "enter")
+	if tr.current().name != "inner" {
+		t.Fatalf("cursor on %s", tr.current().name)
+	}
+	empty := filepath.Join(d, "A_dir", "empty")
+	os.Mkdir(empty, 0o755)
+	tr.Refresh()
+	tr.reveal(empty)
+	tr.cursorPath = empty
+	tr.vis()
+	press(tr, "enter") // expand the empty directory
+	press(tr, "enter")
+	if tr.current().name != "empty" {
+		t.Fatalf("cursor on %s", tr.current().name)
+	}
+}
+
+func TestNoMatchesRow(t *testing.T) {
+	d := setup(t)
+	tr, _ := New(d, false)
+	press(tr, "/")
+	typ(tr, "zzzz")
+	out := tr.View(30, 4, true)
+	if !strings.Contains(out[1], "no matches") || strings.Contains(out[0], "no matches") {
+		t.Fatalf("view %q", out)
+	}
+	typ(tr, "\b")
+	press(tr, "esc")
+	if strings.Contains(strings.Join(tr.View(30, 4, true), ""), "no matches") {
+		t.Fatal("note without filter")
+	}
+}

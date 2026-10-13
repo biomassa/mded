@@ -68,7 +68,7 @@ func (m *Model) sizeOf(path string) (cols, rows int, ok bool) {
 // graphics support, or while the image loads, it is one line of text.
 func (m *Model) imageDocRows(tw, th int) []markdown.Row {
 	d := m.doc
-	name := "🖼 " + d.title()
+	name := "🖼\uFE0F " + d.title()
 	if m.opts.Images != nil {
 		if cols, rows, ok := m.sizeOf(d.abs); ok && cols > 0 {
 			ref := &markdown.ImageRef{Path: d.abs}

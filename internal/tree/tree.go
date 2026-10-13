@@ -516,13 +516,16 @@ func (t *Tree) HandleKey(msg tea.KeyPressMsg) (Action, tea.Cmd) {
 	return Action{}, nil
 }
 
-// enter expands a directory or opens a file.
+// enter expands a directory or opens a file. On an expanded directory it moves to the first child.
 func (t *Tree) enter() Action {
 	n := t.current()
 	if !n.isDir {
 		return Action{Kind: Open, Path: n.path}
 	}
 	if n.expanded {
+		if len(n.children) > 0 {
+			t.moveTo(t.cursor + 1)
+		}
 		return Action{}
 	}
 	return t.expand(n)
@@ -750,6 +753,11 @@ func (t *Tree) View(w, h int, focused bool) []string {
 	out := make([]string, h)
 	for i := range out {
 		idx := t.top + i
+		if idx == 1 && t.filterRoot != nil && len(rows) == 1 {
+			// No entry matches the filter: show a note under the root row.
+			out[i] = ui.Pad(lipgloss.NewStyle().Foreground(theme.C(theme.Dim)).Render("  no matches"), w, lipgloss.NewStyle())
+			continue
+		}
 		if idx >= len(rows) {
 			out[i] = strings.Repeat(" ", max(w, 0))
 			continue

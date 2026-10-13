@@ -402,3 +402,56 @@ func TestCommands(t *testing.T) {
 		})
 	}
 }
+
+func TestOpenLineContinuesList(t *testing.T) {
+	tests := []struct {
+		name, text, script, want string
+		row, col                 int
+	}{
+		{"o bullet", "- item", "oabc<esc>", "- item\n- abc", 1, 4},
+		{"o checkbox open", "- [ ] x", "o<esc>", "- [ ] x\n- [ ] ", 1, 5},
+		{"o checkbox done", "  - [x] x", "oy<esc>", "  - [x] x\n  - [ ] y", 1, 8},
+		{"o number", "3. x", "oy<esc>", "3. x\n4. y", 1, 3},
+		{"O number", "3. x", "Oy<esc>", "3. y\n3. x", 0, 3},
+		{"O bullet", "- x", "Oy<esc>", "- y\n- x", 0, 2},
+		{"o empty item", "  - ", "oy<esc>", "  - \n  y", 1, 2},
+		{"o plain", "text", "oy<esc>", "text\ny", 1, 0},
+		{"2o bullet", "- a", "2ob<esc>", "- a\n- b\n- b", 2, 2},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			v, b := New(4), buffer.New(tc.text)
+			run(v, b, tc.script)
+			if b.Text() != tc.want || b.Row != tc.row || b.Col != tc.col {
+				t.Fatalf("got %q at %d:%d, want %q at %d:%d", b.Text(), b.Row, b.Col, tc.want, tc.row, tc.col)
+			}
+			run(v, b, "u")
+			if b.Text() != tc.text {
+				t.Fatalf("undo gave %q", b.Text())
+			}
+		})
+	}
+}
+
+func TestStartVisual(t *testing.T) {
+	v, b := New(4), buffer.New("abcdef\nxyz")
+	v.StartVisual(b, 0, 1)
+	b.Row, b.Col = 1, 1
+	if v.Mode() != "visual" || !b.SelOn || b.SelRow != 0 || b.SelCol != 1 {
+		t.Fatalf("mode %s sel %v %d:%d", v.Mode(), b.SelOn, b.SelRow, b.SelCol)
+	}
+	run(v, b, "d")
+	if b.Text() != "az" {
+		t.Fatalf("text %q", b.Text())
+	}
+	v.StartVisual(b, 0, 0)
+	v.LeaveVisual(b)
+	if v.Mode() != "normal" || b.SelOn {
+		t.Fatal("LeaveVisual")
+	}
+	run(v, b, "i")
+	v.StartVisual(b, 0, 0)
+	if v.Mode() != "insert" {
+		t.Fatal("insert mode must stay")
+	}
+}

@@ -127,6 +127,7 @@ type Model struct {
 	lastClick  clickInfo
 	dragBorder bool
 	dragSel    bool
+	lastAct    clickAct // what the last click in the view did, for a double-click
 	dragWidth  int
 
 	cmds     []tea.Cmd
@@ -661,6 +662,9 @@ func (m *Model) switchFlavor() {
 // of the document.
 func (m *Model) enterEdit(at *[2]int) {
 	d := m.doc
+	if d.path == "" { // a document without a file has no edit mode
+		return
+	}
 	if d.image {
 		m.status("image files open in view mode only", true)
 		return

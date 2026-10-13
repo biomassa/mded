@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -489,8 +490,10 @@ func TestLinkFollowAndBack(t *testing.T) {
 
 // fakeVim is a keymap that stands for the vim engine in the tests.
 type fakeVim struct {
-	normal bool
-	resets int
+	normal   bool
+	resets   int
+	visual   [2]int // the anchor of the last StartVisual
+	visualOn bool
 }
 
 func (f *fakeVim) Handle(b *buffer.Buffer, k keymap.Key, w, rows int) []keymap.Effect {
@@ -505,6 +508,11 @@ func (f *fakeVim) Hints() string                                { return "esc vi
 func (f *fakeVim) StatusLine() (string, int, bool)              { return "", 0, false }
 func (f *fakeVim) Reset()                                       { f.resets++ }
 func (f *fakeVim) Normal() bool                                 { return f.normal }
+func (f *fakeVim) StartVisual(b *buffer.Buffer, row, col int) {
+	f.visual = [2]int{row, col}
+	f.visualOn = true
+}
+func (f *fakeVim) LeaveVisual(*buffer.Buffer) { f.visualOn = false }
 
 func TestFlavorSwitch(t *testing.T) {
 	p := writeTemp(t, "a.md", "x\n", 0o644)
@@ -672,10 +680,10 @@ func TestImageRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, load := m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
-	if !strings.Contains(screenText(m), "🖼 pic") {
+	if !strings.Contains(screenText(m), "🖼️ pic") {
 		t.Errorf("a loading image shows the alt text:\n%s", screenText(m))
 	}
-	if !strings.Contains(screenText(m), "🖼 x") {
+	if !strings.Contains(screenText(m), "🖼️ x") {
 		t.Error("a remote image shows the alt text")
 	}
 	if load == nil {
@@ -694,7 +702,7 @@ func TestImageRows(t *testing.T) {
 	if n != 2 || len(m.placed) != 2 {
 		t.Fatalf("image rows %d, placed %d", n, len(m.placed))
 	}
-	if strings.Contains(screenText(m), "🖼 pic") {
+	if strings.Contains(screenText(m), "🖼️ pic") {
 		t.Error("the image line still shows the alt text")
 	}
 	if !strings.ContainsRune(screenText(m), '\U0010EEEE') {
@@ -765,5 +773,99 @@ func TestPlainFile(t *testing.T) {
 	s := screenText(m)
 	if !strings.Contains(s, "# not a heading") || !strings.Contains(s, "**plain**") {
 		t.Errorf("screen:\n%s", s)
+	}
+}
+
+func TestEmptyPaneHasNoEdit(t *testing.T) {
+	dir := t.TempDir()
+	m := testModel(t, dir)
+	m.focus = focusDoc
+	press(m, "e", "i")
+	if m.mode != modeView {
+		t.Fatal("edit mode in a document without a file")
+	}
+	m.Update(tea.MouseClickMsg{X: 60, Y: 3, Button: tea.MouseLeft})
+	m.Update(tea.MouseClickMsg{X: 60, Y: 3, Button: tea.MouseLeft})
+	if m.mode != modeView {
+		t.Fatal("double-click opened edit mode")
+	}
+	// A missing file on the command line still opens as a new, editable document.
+	m = testModel(t, filepath.Join(dir, "new.md"))
+	press(m, "e")
+	if m.mode != modeEdit {
+		t.Fatal("a new file must be editable")
+	}
+}
+
+func TestNoSearchPatternMessage(t *testing.T) {
+	m := testModel(t, writeTemp(t, "a.md", "x\n", 0o644))
+	press(m, "n")
+	if m.msg != "no previous regular expression" {
+		t.Errorf("message %q", m.msg)
+	}
+}
+
+func TestDoubleClickOnCheckbox(t *testing.T) {
+	p := writeTemp(t, "a.md", "- [ ] one\n- [ ] two\n", 0o644)
+	m := testModel(t, p)
+	click := func(y int) { m.Update(tea.MouseClickMsg{X: 2, Y: y, Button: tea.MouseLeft}) }
+	click(1)
+	click(1)
+	if got := m.doc.buf.Text(); got != "- [ ] one\n- [ ] two" || m.doc.buf.Dirty() {
+		t.Errorf("text %q dirty %v", got, m.doc.buf.Dirty())
+	}
+	if m.mode != modeEdit || m.doc.buf.Row != 0 {
+		t.Errorf("mode %v row %d", m.mode, m.doc.buf.Row)
+	}
+	if m.doc.buf.UndoDepth() != 0 || m.doc.buf.RedoDepth() != 0 {
+		t.Error("the revert must leave no undo or redo step")
+	}
+	press(m, "esc")
+	// With a change before: only the toggle of the double-click goes back.
+	click(2)
+	time.Sleep(2 * time.Millisecond)
+	m.lastClick = clickInfo{}
+	click(1)
+	click(1)
+	if got := m.doc.buf.Text(); got != "- [ ] one\n- [x] two" || !m.doc.buf.Dirty() {
+		t.Errorf("text %q dirty %v", got, m.doc.buf.Dirty())
+	}
+	if m.mode != modeEdit {
+		t.Error("no edit mode")
+	}
+}
+
+func TestDoubleClickOnLink(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.md")
+	b := filepath.Join(dir, "b.md")
+	os.WriteFile(a, []byte("[go](b.md)\n"), 0o644)
+	os.WriteFile(b, []byte("text\n"), 0o644)
+	m := testModel(t, a)
+	m.Update(tea.MouseClickMsg{X: 2, Y: 1, Button: tea.MouseLeft})
+	m.Update(tea.MouseClickMsg{X: 2, Y: 1, Button: tea.MouseLeft})
+	if m.doc.path != b || m.mode != modeView {
+		t.Errorf("doc %q mode %v", m.doc.path, m.mode)
+	}
+}
+
+func TestVimMouseDrag(t *testing.T) {
+	p := writeTemp(t, "a.md", "abcdef\n", 0o644)
+	fv := &fakeVim{normal: true}
+	m := testModel(t, p)
+	m.opts.NewVim = func(int) keymap.Keymap { return fv }
+	press(m, "ctrl+g", "e")
+	m.Update(tea.MouseClickMsg{X: 4, Y: 1, Button: tea.MouseLeft})
+	if fv.visualOn || m.doc.buf.SelOn {
+		t.Fatal("a click must not select")
+	}
+	m.Update(tea.MouseMotionMsg{X: 7, Y: 1, Button: tea.MouseLeft})
+	if !fv.visualOn || fv.visual != [2]int{0, m.doc.buf.SelCol} || m.doc.buf.SelCol == m.doc.buf.Col {
+		t.Fatalf("visual %v on %v, anchor %d cursor %d", fv.visual, fv.visualOn, m.doc.buf.SelCol, m.doc.buf.Col)
+	}
+	m.Update(tea.MouseReleaseMsg{X: 7, Y: 1, Button: tea.MouseLeft})
+	m.Update(tea.MouseClickMsg{X: 5, Y: 1, Button: tea.MouseLeft})
+	if fv.visualOn {
+		t.Error("a click must leave visual mode")
 	}
 }

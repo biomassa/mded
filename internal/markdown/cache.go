@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"charm.land/glamour/v2"
 	"charm.land/lipgloss/v2"
@@ -170,12 +171,20 @@ func RenderRow(r Row, tw, cx int) string {
 		return r.Pre
 	}
 	var b strings.Builder
-	for k, cl := range r.Cells {
+	for k := 0; k < len(r.Cells); k++ {
+		cl := r.Cells[k]
 		st := cl.St
 		if k == cx {
 			st = st.Reverse(true)
 		}
-		b.WriteString(st.Render(string(cl.R)))
+		// A variation selector or a combining mark goes into the same styled text as the
+		// rune before it. An escape sequence between them breaks the glyph in the terminal.
+		text := []rune{cl.R}
+		for k+1 < len(r.Cells) && joins(r.Cells[k+1].R) {
+			k++
+			text = append(text, r.Cells[k].R)
+		}
+		b.WriteString(st.Render(string(text)))
 	}
 	if cx >= len(r.Cells) && cx >= 0 { // the cursor after the last rune
 		b.WriteString(lipgloss.NewStyle().Reverse(true).Render(" "))
@@ -186,4 +195,10 @@ func RenderRow(r Row, tw, cx int) string {
 		}
 	}
 	return " " + b.String()
+}
+
+// joins reports whether r joins the rune before it: a variation selector or a
+// combining mark.
+func joins(r rune) bool {
+	return r >= 0xFE00 && r <= 0xFE0F || unicode.Is(unicode.Mn, r)
 }

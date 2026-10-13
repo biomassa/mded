@@ -78,6 +78,33 @@ func (b *Buffer) Newline() {
 	b.Insert([]rune(next))
 }
 
+// OpenPrefix returns the start of a new line that vim o (above false) or O (above true) opens
+// next to line row. On a list item, it is the marker of the item, with an empty checkbox if
+// the item has one. A numbered item gives the next number below and the same number above.
+// On an empty item, it is the indent only. On any other line, it is empty.
+func (b *Buffer) OpenPrefix(row int, above bool) string {
+	if row < 0 || row >= len(b.Lines) {
+		return ""
+	}
+	l := string(b.Lines[row])
+	p := listPrefix.FindStringSubmatch(l)
+	if p == nil {
+		return ""
+	}
+	if strings.TrimSpace(l[len(p[0]):]) == "" {
+		return p[1]
+	}
+	marker := p[2]
+	if n, err := strconv.Atoi(strings.TrimRight(marker, ".)")); err == nil && !above {
+		marker = strconv.Itoa(n+1) + marker[len(marker)-1:]
+	}
+	next := p[1] + marker + p[3]
+	if p[4] != "" {
+		next += "[ ] "
+	}
+	return next
+}
+
 // Backspace deletes the rune before the cursor. At the start of a line, it joins the line
 // with the line above.
 func (b *Buffer) Backspace() {
