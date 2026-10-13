@@ -2,6 +2,8 @@
 
 mded is a markdown viewer and editor for the terminal.
 
+![mded: the README in view mode](docs/screenshot.png)
+
 > This software was developed with the assistance of a LLM.
 
 ## Features
