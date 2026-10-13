@@ -123,6 +123,9 @@ func New(root string, showHidden bool) (*Tree, error) {
 // Root returns the root directory.
 func (t *Tree) Root() string { return t.root.path }
 
+// ShowHidden reports whether the sidebar shows hidden entries.
+func (t *Tree) ShowHidden() bool { return t.showHidden }
+
 // Hints returns the key hints of the sidebar.
 func (t *Tree) Hints() string {
 	return "→ open · / filter · ctrl+n new · F2 rename · del delete · ctrl+h hidden"

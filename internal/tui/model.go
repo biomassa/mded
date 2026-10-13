@@ -108,6 +108,7 @@ type Model struct {
 	dlg        *dialog
 	help       *helpState
 	themes     *themePicker
+	img        *imagePicker
 	ctrlW      bool
 
 	// The status line.
@@ -317,8 +318,12 @@ func (m *Model) key(msg tea.KeyPressMsg) {
 		return
 	}
 	if k == "ctrl+q" {
-		m.themes, m.help = nil, nil
+		m.themes, m.help, m.img = nil, nil, nil
 		m.askQuit()
+		return
+	}
+	if m.img != nil {
+		m.imageKey(msg)
 		return
 	}
 	if m.themes != nil {
@@ -384,6 +389,8 @@ func (m *Model) key(msg tea.KeyPressMsg) {
 func (m *Model) paste(text string) {
 	switch {
 	case m.dlg != nil || m.themes != nil || m.help != nil:
+	case m.img != nil:
+		m.pickerPaste(text)
 	case m.search != nil:
 		m.search.insert(text)
 		m.searchUpdate()
@@ -735,6 +742,8 @@ func (m *Model) apply(effects []keymap.Effect) {
 			m.editFile(e.Path)
 		case keymap.KindSwitchFlavor:
 			m.switchFlavor()
+		case keymap.KindOpenImagePicker:
+			m.openImagePicker()
 		case keymap.KindOpenFindBox:
 			m.openFind()
 		case keymap.KindChanged:

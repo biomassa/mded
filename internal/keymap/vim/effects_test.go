@@ -445,3 +445,19 @@ func TestRandomKeys(t *testing.T) {
 		}()
 	}
 }
+
+func TestOpenImagePickerEffects(t *testing.T) {
+	for _, script := range []string{"<c-p>", ":img<cr>", "i<c-p>", "ihi<c-p>there"} {
+		v, b := New(4), buffer.New("aa")
+		fx := run(v, b, script)
+		if !keymap.Has(fx, keymap.KindOpenImagePicker) {
+			t.Errorf("%q: no OpenImagePicker effect", script)
+		}
+	}
+	// Insert mode stays insert, and the key does not type.
+	v, b := New(4), buffer.New("aa")
+	run(v, b, "i<c-p>")
+	if v.ModeLabel() != "INSERT" || b.Text() != "aa" {
+		t.Errorf("mode %s text %q", v.ModeLabel(), b.Text())
+	}
+}

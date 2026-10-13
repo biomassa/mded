@@ -103,6 +103,8 @@ func (v *Vim) exec(c cmd) {
 		v.openPrompt(':', init, nil)
 	case "ctrl+s":
 		v.fx = append(v.fx, keymap.Save())
+	case "ctrl+p":
+		v.fx = append(v.fx, keymap.OpenImagePicker())
 	case "x", "X", "s", "S", "D", "C", "Y":
 		v.shortcut(c)
 	case "J", "gJ":

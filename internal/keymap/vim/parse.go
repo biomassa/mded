@@ -201,7 +201,7 @@ func (p *parser) command(s string, vis bool) int {
 	if !vis {
 		switch s {
 		case "x", "X", "s", "S", "J", "~", "p", "P", "i", "a", "I", "A", "o", "O", "R", "u",
-			"ctrl+r", ".", "D", "C", "Y", "v", "V", ":", "ctrl+s":
+			"ctrl+r", ".", "D", "C", "Y", "v", "V", ":", "ctrl+s", "ctrl+p":
 			c.name = s
 			return stDone
 		case "r", "m", "q", "@":

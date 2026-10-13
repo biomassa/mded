@@ -12,7 +12,7 @@ import (
 // special maps the <name> tokens of a key script to key names.
 var special = map[string]string{
 	"esc": "esc", "cr": "enter", "bs": "backspace", "a-bs": "alt+backspace", "c-r": "ctrl+r",
-	"c-g": "ctrl+g", "c-s": "ctrl+s", "left": "left", "right": "right", "up": "up",
+	"c-g": "ctrl+g", "c-p": "ctrl+p", "c-s": "ctrl+s", "left": "left", "right": "right", "up": "up",
 	"down": "down", "tab": "tab", "del": "delete", "c-d": "ctrl+d", "c-u": "ctrl+u",
 	"c-f": "ctrl+f", "c-b": "ctrl+b", "home": "home", "end": "end",
 }

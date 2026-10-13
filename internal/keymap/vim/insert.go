@@ -8,6 +8,10 @@ import (
 
 // insertKey handles a key in insert mode and in replace mode.
 func (v *Vim) insertKey(k keymap.Key) {
+	if k.Name == "ctrl+p" { // the image picker: the session stays open and does not record the key
+		v.fx = append(v.fx, keymap.OpenImagePicker())
+		return
+	}
 	if v.cur != nil {
 		v.cur.body = append(v.cur.body, k)
 	}

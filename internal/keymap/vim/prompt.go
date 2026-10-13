@@ -393,6 +393,8 @@ func (v *Vim) runEx(line string) {
 			return
 		}
 		v.fx = append(v.fx, keymap.EditFile(args))
+	case "img":
+		v.fx = append(v.fx, keymap.OpenImagePicker())
 	case "noh", "nohl", "nohlsearch":
 		b.ClearHighlight()
 	default:

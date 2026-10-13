@@ -44,6 +44,11 @@ func (m *Model) mouseClick(ms tea.Mouse) {
 	switch {
 	case m.quitting || m.dlg != nil:
 		return
+	case m.img != nil:
+		if ms.Button == tea.MouseLeft {
+			m.imageClick(x, y, dbl)
+		}
+		return
 	case m.themes != nil:
 		m.themeClick(x, y, dbl)
 		return
@@ -256,6 +261,8 @@ func (m *Model) mouseWheel(ms tea.Mouse) {
 		d = -3
 	}
 	switch {
+	case m.img != nil:
+		m.imageWheel(ms.X, ms.Y, d)
 	case m.themes != nil || m.dlg != nil:
 	case m.help != nil:
 		m.help.off += d

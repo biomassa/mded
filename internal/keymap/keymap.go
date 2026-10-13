@@ -32,19 +32,20 @@ type Kind int
 
 // The effects. Each one uses the fields of Effect that its comment names.
 const (
-	KindStatus        Kind = iota // show Text in the status line (an error if Err)
-	KindSetClipboard              // write Text to the system clipboard
-	KindReadClipboard             // read the system clipboard. The text comes back through Keymap.Paste.
-	KindSave                      // save the file
-	KindSaveAs                    // save the file as Path
-	KindQuit                      // quit. The UI refuses or asks if the text is unsaved.
-	KindForceQuit                 // quit and discard unsaved changes
-	KindSaveQuit                  // save, then quit
-	KindExitToView                // leave edit mode
-	KindEditFile                  // open the file Path
-	KindSwitchFlavor              // switch between the conventional and the vim keymap
-	KindOpenFindBox               // open the find and replace box
-	KindChanged                   // the text of the document changed
+	KindStatus          Kind = iota // show Text in the status line (an error if Err)
+	KindSetClipboard                // write Text to the system clipboard
+	KindReadClipboard               // read the system clipboard. The text comes back through Keymap.Paste.
+	KindSave                        // save the file
+	KindSaveAs                      // save the file as Path
+	KindQuit                        // quit. The UI refuses or asks if the text is unsaved.
+	KindForceQuit                   // quit and discard unsaved changes
+	KindSaveQuit                    // save, then quit
+	KindExitToView                  // leave edit mode
+	KindEditFile                    // open the file Path
+	KindSwitchFlavor                // switch between the conventional and the vim keymap
+	KindOpenFindBox                 // open the find and replace box
+	KindChanged                     // the text of the document changed
+	KindOpenImagePicker             // open the image picker. The UI inserts the image line.
 )
 
 // Effect is something that the UI must do after a key.
@@ -93,6 +94,10 @@ func OpenFindBox() Effect { return Effect{Kind: KindOpenFindBox} }
 
 // Changed returns an effect that tells the UI that the text changed.
 func Changed() Effect { return Effect{Kind: KindChanged} }
+
+// OpenImagePicker returns an effect that opens the image picker. The keymap does not change
+// the mode: a vim insert session stays open.
+func OpenImagePicker() Effect { return Effect{Kind: KindOpenImagePicker} }
 
 // Has reports whether effects holds an effect of kind k.
 func Has(effects []Effect, k Kind) bool {

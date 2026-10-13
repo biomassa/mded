@@ -240,6 +240,7 @@ func (m *Model) relayout() {
 	m.follow = false
 	d.off = max(0, min(d.off, len(m.rows)-th))
 	m.placeImages(tw, th)
+	m.pickerSync()
 }
 
 // firstRowOf returns the index of the first text row of a source line, or -1.

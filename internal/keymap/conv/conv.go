@@ -105,6 +105,8 @@ func (c *Conv) handle(b *buffer.Buffer, k keymap.Key, w, pageRows int) []keymap.
 		return []keymap.Effect{keymap.Save()}
 	case "ctrl+f":
 		return []keymap.Effect{keymap.OpenFindBox()}
+	case "ctrl+p":
+		return []keymap.Effect{keymap.OpenImagePicker()}
 	case "esc":
 		b.ClearSel()
 		return []keymap.Effect{keymap.ExitToView()}

@@ -369,3 +369,11 @@ func TestFindBoxEscAndNoMatch(t *testing.T) {
 		t.Error("esc did not close")
 	}
 }
+
+func TestOpenImagePicker(t *testing.T) {
+	c, b := New(4), buffer.New("abc")
+	eff := send(c, b, "ctrl+p")
+	if !has(eff, keymap.KindOpenImagePicker) || b.Text() != "abc" || b.UndoDepth() != 0 {
+		t.Errorf("effects %v text %q", eff, b.Text())
+	}
+}

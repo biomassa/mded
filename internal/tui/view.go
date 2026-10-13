@@ -130,6 +130,9 @@ func (m *Model) promptLine() (text string, cursor int, note string, ok bool) {
 	case m.dlg != nil:
 		q, keys := m.dialogText()
 		return theme.St(theme.Text).Bold(true).Render(q) + "  " + theme.St(theme.Dim).Render(keys), -1, "", true
+	case m.img != nil && m.img.altOn:
+		t, c := m.img.altLine()
+		return t, c, "", true
 	case m.search != nil:
 		t, c := m.search.line()
 		return t, c, m.search.note, true
@@ -259,6 +262,10 @@ func (m *Model) overlays(screen string) string {
 	if m.themes != nil {
 		r := m.themeRect()
 		layers = append(layers, lipgloss.NewLayer(m.themeBox()).X(r.x).Y(r.y).Z(2))
+	}
+	if m.img != nil && !m.img.altOn {
+		r := m.pickerRect()
+		layers = append(layers, lipgloss.NewLayer(m.pickerBox()).X(r.x).Y(r.y).Z(3))
 	}
 	if len(layers) == 1 {
 		return screen
