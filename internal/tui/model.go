@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -121,6 +122,7 @@ type Model struct {
 	placed map[int]placedImage
 
 	imgTried map[string]bool // image files that a load started for
+	shown    *atomic.Int64   // the time of the first View call (Unix ns), or 0: see afterFirstFrame
 	imgGen   int             // counts finished image loads, for the layout key
 
 	// Mouse state.
@@ -153,6 +155,7 @@ func New(o Options) (*Model, error) {
 		sidebarW:  cfg.SidebarWidth,
 		vimFlavor: (o.Vim || cfg.DefaultMode == "vim") && o.NewVim != nil,
 		imgTried:  map[string]bool{},
+		shown:     new(atomic.Int64),
 	}
 	root, file := ".", ""
 	if o.Path != "" {

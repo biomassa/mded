@@ -3,6 +3,7 @@ package tui
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -22,6 +23,7 @@ const emptyHint = "no file open · pick one in the sidebar"
 
 // View draws the screen. It only reads the state that Update built.
 func (m *Model) View() tea.View {
+	m.shown.CompareAndSwap(0, time.Now().UnixNano())
 	v := tea.NewView(m.screen())
 	v.MouseMode = tea.MouseModeCellMotion // clicks, wheel, and motion while a button is down
 	v.AltScreen = true

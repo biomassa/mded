@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"time"
+
+	tea "charm.land/bubbletea/v2"
 	"path/filepath"
 	"strings"
 
@@ -105,7 +108,7 @@ func (m *Model) placeImages(tw, th int) {
 			continue
 		}
 		id, cmd := img.Place(path, cols, rows)
-		m.cmd(cmd)
+		m.cmd(m.afterFirstFrame(cmd))
 		if id == 0 {
 			continue
 		}
@@ -113,5 +116,29 @@ func (m *Model) placeImages(tw, th int) {
 			m.placed = map[int]placedImage{}
 		}
 		m.placed[i] = placedImage{id, cols}
+	}
+}
+
+// frameDelay is the time from the first View call until the first frame is surely on the
+// screen. The renderer draws frames on a 60 Hz ticker.
+const frameDelay = 100 * time.Millisecond
+
+// afterFirstFrame makes an image transmit command wait until the first frame is on the
+// screen. bubbletea writes a raw sequence at once, but it goes to the alternate screen only
+// with the first frame. kitty keeps the images of the main screen and of the alternate
+// screen apart, so an image that comes before the first frame does not show.
+func (m *Model) afterFirstFrame(cmd tea.Cmd) tea.Cmd {
+	if cmd == nil {
+		return nil
+	}
+	shown := m.shown
+	return func() tea.Msg {
+		for shown.Load() == 0 {
+			time.Sleep(10 * time.Millisecond)
+		}
+		if d := time.Until(time.Unix(0, shown.Load()).Add(frameDelay)); d > 0 {
+			time.Sleep(d)
+		}
+		return cmd()
 	}
 }
