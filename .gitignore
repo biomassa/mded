@@ -1,0 +1,20 @@
+# Build output
+/mded
+*.test
+*.out
+
+# Local settings
+config.toml
+.env
+*.env
+
+# AI assistant files
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+.claude-work/
+.mcp.json
+AGENTS.md
+
+# Release builds
+/dist/
