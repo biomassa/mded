@@ -9,12 +9,13 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- The mark of a picture that cannot show is `📷`, not `🖼`.
 - The level 1 heading has a deeper bar with near-white text on a dark theme. Before, its text was black.
 - The heading levels are easy to tell apart in all themes. Levels 1 and 2 have a bar to the full width, and levels 3 and 4 a short bar. The bar colors go from level 1 to the background in equal steps of perceived color difference. Levels 5 and 6 have no bar: level 5 has bold accent text, and level 6 plain accent text.
 
 ### Fixed
 
-- The screen does not shift up by one row when a picture loads. The picture transmit did not keep the cursor in place, so the terminal scrolled at the bottom row. Before, the screen was correct only after a resize.
+- The screen does not shift up by one row. The picture mark `🖼` with a variation selector was one cell wide for the renderer and two cells wide in the terminal (kitty), so its row wrapped. Before, the screen was correct only after a resize.
 - Inline markdown in bold, italic, strikethrough, and link text shows formatted. Before, code in bold text showed its backticks.
 
 ## [0.1.1] - 2026-10-13

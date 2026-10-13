@@ -43,8 +43,8 @@ func TestPreviewCells(t *testing.T) {
 		{"snake_case_name", "snake_case_name", 0},
 		{"see [site](http://x.y) now", "see site now", 0},
 		{"see http://x.y/z now", "see http://x.y/z now", 0},
-		{"pic ![cat](a/b.png) end", "pic 🖼️ cat end", 0},
-		{"![](a/b.png)", "🖼️ b.png", 0},
+		{"pic ![cat](a/b.png) end", "pic 📷 cat end", 0},
+		{"![](a/b.png)", "📷 b.png", 0},
 		{"---", "─", -1},
 	}
 	for _, c := range cases {
@@ -81,14 +81,14 @@ func TestPreviewSrc(t *testing.T) {
 	}
 	// Image alt cells.
 	cells, _ = PreviewCells("![ab](p)")
-	if text(cells) != "🖼️ ab" || cells[3].Src != 2 || cells[4].Src != 3 {
+	if text(cells) != "📷 ab" || cells[2].Src != 2 || cells[3].Src != 3 {
 		t.Errorf("image cells %q %+v", text(cells), cells)
 	}
 }
 
 func TestImageTakesPriorityOverLink(t *testing.T) {
 	cells, _ := PreviewCells("![a](p.png)")
-	if strings.Contains(text(cells), "a") && !strings.HasPrefix(text(cells), "🖼️") {
+	if strings.Contains(text(cells), "a") && !strings.HasPrefix(text(cells), "📷") {
 		t.Errorf("got %q", text(cells))
 	}
 	refs := FindImages("x ![a b](dir/p.png) y ![](q.jpg) `![c](d)`")
@@ -313,10 +313,10 @@ func TestLayoutImages(t *testing.T) {
 	}
 	want := []string{
 		"IMGa", "IMGa", "IMGa", // alone: image rows replace the text
-		"text 🖼️ b more", "IMGb", "IMGb", "IMGb", // inline: text, then rows
+		"text 📷 b more", "IMGb", "IMGb", "IMGb", // inline: text, then rows
 		"IMGc", "IMGc", "IMGc", // alone with spaces
-		"🖼️ d", // size not ok: text only
-		"🖼️ e 🖼️ f", "IMGe", "IMGe", "IMGe", "IMGf", "IMGf", "IMGf",
+		"📷 d", // size not ok: text only
+		"📷 e 📷 f", "IMGe", "IMGe", "IMGe", "IMGf", "IMGf", "IMGf",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got  %q\nwant %q", got, want)

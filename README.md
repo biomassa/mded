@@ -220,7 +220,7 @@ mded shows pictures in terminals with the kitty graphics protocol: kitty and Gho
 - A picture shows at its natural size. If it is too large, mded makes it smaller to fit the width of the pane and `image_max_rows`.
 - A picture alone on its line replaces the line. A picture in a line of text shows below the line.
 - In edit mode, the line with the cursor shows its source, and its pictures do not show.
-- Without picture support, mded shows `🖼` and the alt text, or the file name if the alt text is empty.
+- Without picture support, mded shows `📷` and the alt text, or the file name if the alt text is empty.
 
 ### Insert a picture
 

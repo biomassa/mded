@@ -700,10 +700,10 @@ func TestImageRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, load := m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
-	if !strings.Contains(screenText(m), "🖼️ pic") {
+	if !strings.Contains(screenText(m), "📷 pic") {
 		t.Errorf("a loading image shows the alt text:\n%s", screenText(m))
 	}
-	if !strings.Contains(screenText(m), "🖼️ x") {
+	if !strings.Contains(screenText(m), "📷 x") {
 		t.Error("a remote image shows the alt text")
 	}
 	if load == nil {
@@ -722,7 +722,7 @@ func TestImageRows(t *testing.T) {
 	if n != 2 || len(m.placed) != 2 {
 		t.Fatalf("image rows %d, placed %d", n, len(m.placed))
 	}
-	if strings.Contains(screenText(m), "🖼️ pic") {
+	if strings.Contains(screenText(m), "📷 pic") {
 		t.Error("the image line still shows the alt text")
 	}
 	if !strings.ContainsRune(screenText(m), '\U0010EEEE') {

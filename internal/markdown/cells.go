@@ -119,12 +119,13 @@ func inlineCells(s string, offset int, base lipgloss.Style, spans *[]span) []Cel
 		case strings.HasPrefix(tok, "~~"):
 			inner(a+2, b-2, base.Strikethrough(true), spans)
 		case strings.HasPrefix(tok, "!["):
-			// An image reference shows as "🖼 alt" in the link style, with no hyperlink. The
-			// variation selector U+FE0F makes the glyph two cells wide in all terminals, and two
-			// cells count two columns.
+			// An image reference shows as "📷 alt" in the link style, with no hyperlink. The
+			// camera is two cells wide by every width method. A glyph with a variation
+			// selector (such as 🖼 U+FE0F) is not: the renderer counts it one cell, the
+			// terminal draws two, and the row wraps.
 			st := base.Foreground(theme.C(theme.Link)).Underline(true)
 			mid := strings.Index(tok, "](")
-			out = append(out, Cell{'🖼', st, offset + a}, Cell{'\uFE0F', st, offset + a}, Cell{' ', st, offset + a})
+			out = append(out, Cell{'📷', st, offset + a}, Cell{' ', st, offset + a})
 			if alt := tok[2:mid]; alt != "" {
 				part(a+2, a+2+utf8.RuneCountInString(alt), st)
 			} else { // no alt text: show the file name
