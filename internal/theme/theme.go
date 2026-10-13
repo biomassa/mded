@@ -17,7 +17,7 @@ import (
 
 // Theme colors. Apply sets them. The default is the dark "default" theme.
 var (
-	Accent   = "#DC4C3E" // the focus color
+	Accent   = "#4180FF" // the focus color
 	Error    string      // errors (overdue in godoist)
 	Good     string      // done, saved (today in godoist)
 	Warn     string      // warnings (tomorrow in godoist)
@@ -41,7 +41,7 @@ func init() { setDefault(true) }
 // setDefault selects the dark or the light colors of the "default" theme.
 func setDefault(dark bool) {
 	darkTheme = dark
-	Accent = "#DC4C3E"
+	Accent = "#4180FF" // blue
 	chromaStyle = ""
 	if dark {
 		Error, Good, Warn, Purple = "#FF7066", "#25B84C", "#FF9A14", "#A970FF"
@@ -102,7 +102,8 @@ func Fg(h string) string {
 }
 
 // A palette is a color theme. The "default" theme has no palette: it uses the godoist
-// "todoist" colors, and the terminal background selects its dark or light form. The other
+// "todoist" colors with a blue accent, and the terminal background selects its dark or
+// light form. The other
 // palettes come from tideui by Allie Bayless (github.com/allisonhere/tideui, MIT license).
 type palette struct {
 	name          string
