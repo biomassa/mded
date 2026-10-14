@@ -293,7 +293,7 @@ func Label(name string) string {
 // background.
 func headingAccent() string { return Readable(Accent, BaseBg, 3) }
 
-// headingLight is the bright text of levels 1 and 2: near white on a dark theme, near black
+// headingLight is the bright text of levels 1 to 3: near white on a dark theme, near black
 // on a light theme, with a tint of the accent.
 func headingLight() string {
 	if darkTheme {
@@ -357,12 +357,12 @@ func HeadingFill(level int) int {
 
 // HeadingColors returns the text and the bar color of a heading level. Levels 1 to 4 have a
 // bar in the accent: level 1 is the strongest, and each lower level goes toward the
-// background. The text is bright for levels 1 and 2 and the text color for levels 3 and 4.
+// background. The text is bright for levels 1 to 3 and the text color for level 4.
 // Levels 5 and 6 have no bar (bar is the background) and accent text.
 func HeadingColors(level int) (text, bar string) {
 	lv := max(1, min(level, 6))
 	switch {
-	case lv <= 2:
+	case lv <= 3:
 		text = headingLight()
 	case lv <= headingBarLevels:
 		text = Text

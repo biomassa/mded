@@ -258,7 +258,7 @@ Drag the border between the sidebar and the document to change the width. mded s
 
 `T` in view mode opens the theme picker. A move shows the theme. `enter` keeps it and saves it in the config file. `esc` goes back to the theme in use.
 
-The themes are: default, catppuccin-mocha, catppuccin-latte, catppuccin-frappe, catppuccin-macchiato, nord, dracula, gruvbox-dark, gruvbox-light, tokyo-night, tokyo-night-day, rose-pine, rose-pine-moon, rose-pine-dawn, one-dark, magenta-geode, coral-sunset, lavender-fields-forever, vt100, and vt52. The `default` theme uses the colors of your terminal. Headings use the accent of the theme. Levels 1 and 2 have a bar to the full width, and levels 3 and 4 a short bar. The text of level 1 is in the middle of its bar. Each lower level has a fainter bar, in steps that are easy to see in all themes. Levels 5 and 6 have no bar: level 5 has bold accent text, and level 6 plain accent text.
+The themes are: default, catppuccin-mocha, catppuccin-latte, catppuccin-frappe, catppuccin-macchiato, nord, dracula, gruvbox-dark, gruvbox-light, tokyo-night, tokyo-night-day, rose-pine, rose-pine-moon, rose-pine-dawn, one-dark, magenta-geode, coral-sunset, lavender-fields-forever, vt100, and vt52. The `default` theme uses the colors of your terminal. Headings use the accent of the theme. Levels 1 and 2 have a bar to the full width, and levels 3 and 4 a short bar. The text of level 1 is in the middle of its bar. Levels 1 to 3 have bright bold text, and level 4 bold text in the text color. Each lower level has a fainter bar, in steps that are easy to see in all themes. Levels 5 and 6 have no bar: level 5 has bold accent text, and level 6 plain accent text.
 
 ## Config
 

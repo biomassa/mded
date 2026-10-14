@@ -9,6 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- A level 3 heading has the bright bold text of level 2, on its short bar.
 - The text of a level 1 heading is in the middle of its bar. A heading that shows as source (the line with the cursor in edit mode) stays at the left.
 
 ## [0.1.2] - 2026-10-13
