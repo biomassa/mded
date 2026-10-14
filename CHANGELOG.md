@@ -7,6 +7,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+
+- The panes have no frame. A line with the file name is at the top, and a line is at the bottom, above the status line. A vertical line separates the sidebar from the document. The top line of the pane with the focus has the accent color.
+
 ## [0.1.3] - 2026-10-14
 
 ### Changed

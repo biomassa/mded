@@ -124,9 +124,10 @@ func TestIndentParagraphAlignsWithHeadingText(t *testing.T) {
 			t.Errorf("%q at %d, left of %d", s, x, px)
 		}
 	}
-	// The bar keeps its left edge.
-	if !strings.HasPrefix(screenLines(m)[rowOf(t, m, "Title")], "│ ") {
-		t.Errorf("heading row %q", screenLines(m)[rowOf(t, m, "Title")])
+	// The bar keeps its left edge: column 2, after the empty side column and the row margin.
+	raw := strings.Split(m.View().Content, "\n")[rowOf(t, m, "Title")]
+	if i := strings.Index(raw, "48;2;"); i < 0 || ansi.StringWidth(ansi.Strip(raw[:i])) != 2 {
+		t.Errorf("heading bar does not start at column 2: %q", raw)
 	}
 }
 

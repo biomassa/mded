@@ -52,7 +52,7 @@ func (m *Model) screen() string {
 			border = theme.Accent
 			title = theme.St(theme.Fg(theme.Accent)).Bold(true).Render(m.tree.Title())
 		}
-		panes = append(panes, ui.Box(title, m.tree.View(tr.w-2, tr.h-2, m.focus == focusTree), tr.w, border))
+		panes = append(panes, ui.Pane(title, m.tree.View(tr.w-2, tr.h-2, m.focus == focusTree), tr.w, border, theme.Border, true))
 	}
 	border := theme.Border
 	title := theme.St(theme.Muted).Bold(true).Render(m.doc.title())
@@ -60,7 +60,7 @@ func (m *Model) screen() string {
 		border = theme.Accent
 		title = theme.St(theme.Fg(theme.Accent)).Bold(true).Render(m.doc.title())
 	}
-	panes = append(panes, ui.Box(title, m.docLines(dr.w-2, dr.h-2), dr.w, border))
+	panes = append(panes, ui.Pane(title, m.docLines(dr.w-2, dr.h-2), dr.w, border, theme.Border, false))
 	screen := lipgloss.JoinHorizontal(lipgloss.Top, panes...) + "\n" + m.statusLine()
 	return m.overlays(screen)
 }

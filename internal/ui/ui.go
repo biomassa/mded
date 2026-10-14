@@ -88,3 +88,30 @@ func Box(title string, lines []string, w int, borderHex string) string {
 	sb.WriteString("\n" + b.Render("╰"+strings.Repeat("─", inner)+"╯"))
 	return sb.String()
 }
+
+// Pane draws a pane with only a top line and a bottom line, w cells wide. The top line has
+// the title. The side columns stay empty, so that the text keeps the position that it has in
+// a Box. If sep is true, the right column is a vertical line in sepHex that separates the
+// pane from the pane at its right, and the top and the bottom line join it with ┬ and ┴.
+// lineHex is the color of the top line: the accent for the pane with the focus.
+func Pane(title string, lines []string, w int, lineHex, sepHex string, sep bool) string {
+	top, sp := theme.St(lineHex), theme.St(sepHex)
+	inner := w - 2
+	end, side, bottomEnd := top.Render("─"), " ", sp.Render("─")
+	if sep {
+		end, side, bottomEnd = sp.Render("┬"), sp.Render("│"), sp.Render("┴")
+	}
+	var sb strings.Builder
+	if title == "" {
+		sb.WriteString(top.Render(strings.Repeat("─", inner+1)) + end)
+	} else {
+		title = Trunc(title, max(0, inner-4))
+		fill := max(0, inner-3-lipgloss.Width(title))
+		sb.WriteString(top.Render("── ") + title + top.Render(" "+strings.Repeat("─", fill)) + end)
+	}
+	for _, l := range lines {
+		sb.WriteString("\n " + l + side)
+	}
+	sb.WriteString("\n" + sp.Render(strings.Repeat("─", inner+1)) + bottomEnd)
+	return sb.String()
+}
