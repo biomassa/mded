@@ -35,7 +35,6 @@ func isFence(l []rune) bool { return hasPrefixTrim(l, "```") }
 // goes to the last line.
 func Blocks(lines [][]rune) []Block {
 	var out []Block
-	isRow := func(i int) bool { return hasPrefixTrim(lines[i], "|") }
 	for i := 0; i < len(lines); i++ {
 		if isFence(lines[i]) {
 			j := i + 1
@@ -46,9 +45,9 @@ func Blocks(lines [][]rune) []Block {
 			i = j
 			continue
 		}
-		if isRow(i) && i+1 < len(lines) && tableSep.MatchString(string(lines[i+1])) {
+		if isTableStart(lines, i) {
 			j := i + 1
-			for j+1 < len(lines) && isRow(j+1) {
+			for j+1 < len(lines) && hasPipe(lines[j+1]) && !isFence(lines[j+1]) {
 				j++
 			}
 			out = append(out, Block{From: i, To: j, Table: true})
@@ -56,6 +55,30 @@ func Blocks(lines [][]rune) []Block {
 		}
 	}
 	return out
+}
+
+// hasPipe reports whether l has a "|" that is not escaped.
+func hasPipe(l []rune) bool {
+	for i, r := range l {
+		if r == '|' && (i == 0 || l[i-1] != '\\') {
+			return true
+		}
+	}
+	return false
+}
+
+// isTableStart reports whether line i is the header of a table, as in GitHub Flavored
+// Markdown: a line with a "|", then a delimiter row with the same number of cells. A
+// heading, a list item, or a quote is not a header.
+func isTableStart(lines [][]rune, i int) bool {
+	if !hasPipe(lines[i]) || i+1 >= len(lines) || !tableDelim.MatchString(string(lines[i+1])) {
+		return false
+	}
+	src := string(lines[i])
+	if lv, _ := HeadingLevel(src); lv > 0 || bulletItem.MatchString(src) || numberItem.MatchString(src) || quoteLine.MatchString(src) {
+		return false
+	}
+	return len(splitTableRow(lines[i])) == len(splitTableRow(lines[i+1]))
 }
 
 // plain strips markdown links and bold markers for single-line display.

@@ -453,3 +453,42 @@ func TestNestedInline(t *testing.T) {
 		t.Errorf("items %+v", items)
 	}
 }
+
+// Tables follow GitHub Flavored Markdown: a delimiter row with one dash or more, and
+// optional outer pipes. A list item, a rule, or a header with another number of cells
+// is not a table.
+func TestTableRule(t *testing.T) {
+	for src, want := range map[string]bool{
+		"| a | b |\n|:-|-:|\n| 1 | 2 |": true,
+		"a | b\n--|--\n1 | 2":           true,
+		"| a |\n| --- |":                true,
+		"a | b\n---":                    false,
+		"- a | b\n--|--":                false,
+		"text\n---":                     false,
+		"a \\| b\n--|--":                false,
+	} {
+		got := Blocks(runes(src))
+		if is := len(got) == 1 && got[0].Table; is != want {
+			t.Errorf("%q: table %v, want %v", src, is, want)
+		}
+	}
+}
+
+// A backslash escape shows the mark as text, and an autolink shows its URL as a link.
+func TestEscapeAndAutolink(t *testing.T) {
+	for src, want := range map[string]string{
+		`\*not italic\*`:         "*not italic*",
+		"a \\`b\\` c":            "a `b` c",
+		"see <https://x.org/a>.": "see https://x.org/a.",
+		"`\\*`":                  "\\*",
+	} {
+		cells, _ := PreviewCells(src)
+		if got := text(cells); got != want {
+			t.Errorf("%q: got %q, want %q", src, got, want)
+		}
+	}
+	items := Items(runes("see <https://x.org/a>"))
+	if len(items) != 1 || items[0].URL != "https://x.org/a" {
+		t.Errorf("items = %+v", items)
+	}
+}

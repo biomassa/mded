@@ -39,15 +39,17 @@ type Row struct {
 
 var (
 	// inlineToken matches the inline markdown that the preview renders, in order of
-	// priority: code, bold, strike, image, link, bare URL, italic. An image starts with
-	// "!", so it wins over the link token at the same place.
-	inlineToken = regexp.MustCompile("`[^`]+`|\\*\\*[^*]+\\*\\*|__[^_]+__|~~[^~]+~~|!\\[[^\\]]*\\]\\([^)\\s]+\\)|\\[[^\\]]+\\]\\([^)\\s]+\\)|https?://[^\\s<>()\\[\\]]+|\\*[^*\\s][^*]*\\*|_[^_\\s][^_]*_")
+	// priority: backslash escape, code, autolink, bold, strike, image, link, bare URL,
+	// italic. An image starts with "!", so it wins over the link token at the same place.
+	inlineToken = regexp.MustCompile("\\\\[!-/:-@\\[-`{-~]|`[^`]+`|<[a-zA-Z][a-zA-Z0-9+.-]{1,31}:[^\\s<>]*>|\\*\\*[^*]+\\*\\*|__[^_]+__|~~[^~]+~~|!\\[[^\\]]*\\]\\([^)\\s]+\\)|\\[[^\\]]+\\]\\([^)\\s]+\\)|https?://[^\\s<>()\\[\\]]+|\\*[^*\\s][^*]*\\*|_[^_\\s][^_]*_")
 	checkItem   = regexp.MustCompile(`^(\s*)([-*+]|\d+[.)])\s+\[([ xX])\]\s+(.*)$`)
 	bulletItem  = regexp.MustCompile(`^(\s*)[-*+]\s+(.*)$`)
 	numberItem  = regexp.MustCompile(`^(\s*)(\d+[.)])\s+(.*)$`)
 	quoteLine   = regexp.MustCompile(`^\s*>\s?(.*)$`)
 	ruleLine    = regexp.MustCompile(`^\s*([-*_])(\s*[-*_]){2,}\s*$`)
-	tableSep    = regexp.MustCompile(`^\s*\|?\s*:?-{3,}`)
+	// tableDelim matches the delimiter row of a table: cells of dashes with optional
+	// colons, between pipes. The outer pipes are optional.
+	tableDelim = regexp.MustCompile(`^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$`)
 )
 
 // token is one inline element of a text. a and b are rune offsets.
@@ -112,8 +114,14 @@ func inlineCells(s string, offset int, base lipgloss.Style, spans *[]span) []Cel
 		a, b, tok := t.a, t.b, t.text
 		part(at, a, base)
 		switch {
+		case tok[0] == '\\': // an escaped mark shows as text
+			part(a+1, b, base)
 		case tok[0] == '`':
 			part(a+1, b-1, base.Foreground(theme.C(theme.Code)))
+		case tok[0] == '<': // an autolink: <https://example.com>
+			url := tok[1 : len(tok)-1]
+			part(a+1, b-1, base.Foreground(theme.C(theme.Link)).Underline(true).Hyperlink(url))
+			add(Link, a, b, url)
 		case strings.HasPrefix(tok, "**") || strings.HasPrefix(tok, "__"):
 			inner(a+2, b-2, base.Bold(true), spans)
 		case strings.HasPrefix(tok, "~~"):

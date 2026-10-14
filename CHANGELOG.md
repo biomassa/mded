@@ -7,6 +7,15 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- A backslash escape shows the mark as text: `\*` shows `*`.
+- An autolink (`<https://example.com>`) shows its URL as a link. `tab` selects it in view mode.
+
+### Changed
+
+- Tables follow GitHub Flavored Markdown. The delimiter row can have one dash or more for each column, and the outer pipes are optional. Before, a table needed three dashes and a pipe at the start of each line.
+
 ## [0.1.4] - 2026-10-14
 
 ### Changed
