@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-14
+
 ### Changed
 
 - A level 3 heading has the bright bold text of level 2, on its short bar.
@@ -63,7 +65,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Color themes from godoist, with a theme picker (`T`). Each heading level has its own color in all themes.
 - A config file: `~/.config/mded/config.toml`.
 
-[Unreleased]: https://github.com/biomassa/mded/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/biomassa/mded/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/biomassa/mded/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/biomassa/mded/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/biomassa/mded/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/biomassa/mded/releases/tag/v0.1.0
