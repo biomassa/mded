@@ -83,14 +83,40 @@ func clipboardOf(cmd tea.Cmd) string {
 	return ""
 }
 
+// The text of a level 1 heading is in the middle of the pane, in view mode. As source (edit
+// mode, cursor on it), it is at the left.
+func TestLevelOneHeadingCentered(t *testing.T) {
+	m := testModelSize(t, writeTemp(t, "c.md", "# Middle\n\ntext\n", 0o644), 60, 20)
+	y := rowOf(t, m, "Middle")
+	line := []rune(screenLines(m)[y])
+	x := colOf(t, m, y, "Middle")
+	left, right := x, 0
+	for i := len(line) - 2; i >= 0 && line[i] == ' '; i-- { // the border is the last cell
+		right++
+	}
+	if d := left - 1 - right; d < -2 || d > 2 { // the space before and after the text
+		t.Errorf("not centered: %d cells before, %d after in %q", left, right, string(line))
+	}
+	press(m, "e", "ctrl+home")
+	m.doc.buf.MoveTo(0, 0)
+	m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+	y = rowOf(t, m, "# Middle")
+	if x := colOf(t, m, y, "# Middle"); x > 4 {
+		t.Errorf("source heading at column %d, want the left", x)
+	}
+}
+
 // A paragraph starts in the same column as the text of a heading, in view mode.
 func TestIndentParagraphAlignsWithHeadingText(t *testing.T) {
-	m := selModel(t)
-	hy, py := rowOf(t, m, "Title"), rowOf(t, m, "Some ")
-	hx, px := colOf(t, m, hy, "Title"), colOf(t, m, py, "Some")
-	if hx != px {
-		t.Errorf("heading text at %d, paragraph at %d", hx, px)
+	// A level 2 heading is left-aligned: its text and a paragraph start in one column.
+	m2 := testModelSize(t, writeTemp(t, "b.md", "## Second\n\nSome text\n", 0o644), 60, 20)
+	hy2, py2 := rowOf(t, m2, "Second"), rowOf(t, m2, "Some ")
+	if hx, px := colOf(t, m2, hy2, "Second"), colOf(t, m2, py2, "Some"); hx != px {
+		t.Errorf("level 2 heading text at %d, paragraph at %d", hx, px)
 	}
+	m := selModel(t)
+	py := rowOf(t, m, "Some ")
+	px := colOf(t, m, py, "Some")
 	// Every other kind of row has the same indent.
 	for _, s := range []string{"task one", "item two", "quote", "foo := 1", "last"} {
 		y := rowOf(t, m, s)
@@ -99,8 +125,8 @@ func TestIndentParagraphAlignsWithHeadingText(t *testing.T) {
 		}
 	}
 	// The bar keeps its left edge.
-	if !strings.HasPrefix(screenLines(m)[hy], "│ ") {
-		t.Errorf("heading row %q", screenLines(m)[hy])
+	if !strings.HasPrefix(screenLines(m)[rowOf(t, m, "Title")], "│ ") {
+		t.Errorf("heading row %q", screenLines(m)[rowOf(t, m, "Title")])
 	}
 }
 

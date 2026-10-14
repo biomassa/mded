@@ -7,6 +7,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+
+- The text of a level 1 heading is in the middle of its bar. A heading that shows as source (the line with the cursor in edit mode) stays at the left.
+
 ## [0.1.2] - 2026-10-13
 
 ### Changed

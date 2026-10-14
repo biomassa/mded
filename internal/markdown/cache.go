@@ -158,12 +158,42 @@ func (c *Cache) PreviewRows(src string, tw int) []Row {
 			if level > 0 {
 				row.Fill = level
 			}
+			if level == 1 {
+				row.Cells = centerCells(row.Cells, tw)
+			}
 			row.Pre = RenderRow(row, tw, -1)
 			rows = append(rows, row)
 		}
 	}
 	c.preview[src] = rows
 	return rows
+}
+
+// centerCells puts the text of a level 1 heading row in the middle of a bar of width tw.
+// It drops the spaces around the text and adds padding cells before it. The padding cells
+// have the bar style and the source position of the first text cell, for a click.
+func centerCells(cells []Cell, tw int) []Cell {
+	a, b := 0, len(cells)
+	for a < b && cells[a].R == ' ' {
+		a++
+	}
+	for b > a && cells[b-1].R == ' ' {
+		b--
+	}
+	if a == b {
+		return cells
+	}
+	text := cells[a:b]
+	var sb strings.Builder
+	for _, c := range text {
+		sb.WriteRune(c.R)
+	}
+	pad := max(1, (tw-ansi.StringWidth(sb.String()))/2)
+	out := make([]Cell, 0, pad+len(text))
+	for range pad {
+		out = append(out, Cell{' ', theme.HeadingStyle(1), text[0].Src})
+	}
+	return append(out, text...)
 }
 
 // BodyWidth returns the width of the text of a row that is not a heading bar. The row has
