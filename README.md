@@ -74,8 +74,8 @@ GOTOOLCHAIN=go1.27.1 go install -trimpath -ldflags="-s -w" github.com/biomassa/m
 Each [release](https://github.com/biomassa/mded/releases) has binaries for Linux and macOS (amd64 and arm64). You do not need Go for them. Download the archive for your system, then extract `mded` to a directory in your `PATH`:
 
 ```sh
-tar -xzf mded_0.1.3_linux_amd64.tar.gz
-install mded_0.1.3_linux_amd64/mded ~/.local/bin/
+tar -xzf mded_0.1.4_linux_amd64.tar.gz
+install mded_0.1.4_linux_amd64/mded ~/.local/bin/
 ```
 
 On macOS, a downloaded binary can get a quarantine flag. If macOS refuses to start it, remove the flag with `xattr -d com.apple.quarantine ~/.local/bin/mded`.

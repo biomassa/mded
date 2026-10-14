@@ -7,11 +7,18 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-## [0.1.3] - 2026-10-14
+## [0.1.4] - 2026-10-14
 
 ### Changed
 
 - The panes have no frame. A line with the file name is at the top, and a line is at the bottom, above the status line. A vertical line separates the sidebar from the document. The top line of the pane with the focus has the accent color.
+
+The release binaries of 0.1.3 already have this change. `go install` of 0.1.3 does not.
+
+## [0.1.3] - 2026-10-14
+
+### Changed
+
 - A level 3 heading has the bright bold text of level 2, on its short bar.
 - The text of a level 1 heading is in the middle of its bar. A heading that shows as source (the line with the cursor in edit mode) stays at the left.
 
@@ -66,7 +73,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Color themes from godoist, with a theme picker (`T`). Each heading level has its own color in all themes.
 - A config file: `~/.config/mded/config.toml`.
 
-[Unreleased]: https://github.com/biomassa/mded/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/biomassa/mded/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/biomassa/mded/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/biomassa/mded/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/biomassa/mded/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/biomassa/mded/compare/v0.1.0...v0.1.1
