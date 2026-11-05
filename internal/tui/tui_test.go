@@ -643,6 +643,89 @@ func TestThemePicker(t *testing.T) {
 	}
 }
 
+// sidebarModel makes a model whose sidebar has the focus, in a directory with one file.
+func sidebarModel(t *testing.T) *Model {
+	t.Helper()
+	m := testModel(t, writeTemp(t, "a.md", "x\n", 0o644))
+	press(m, "ctrl+e")
+	if m.focus != focusTree {
+		t.Fatal("the sidebar has no focus")
+	}
+	return m
+}
+
+func TestSidebarQuitAndHelp(t *testing.T) {
+	m := sidebarModel(t)
+	press(m, "?")
+	if m.help == nil {
+		t.Fatal("? did not open the help")
+	}
+	press(m, "esc", "q")
+	if !m.quitting {
+		t.Fatal("q did not quit")
+	}
+	// With unsaved changes, q asks first.
+	m = testModel(t, writeTemp(t, "b.md", "- [ ] one\n", 0o644))
+	press(m, "tab", "space", "ctrl+e", "q")
+	if m.dlg == nil || m.quitting {
+		t.Fatal("q must open the unsaved dialog")
+	}
+}
+
+func TestSidebarPromptKeepsText(t *testing.T) {
+	m := sidebarModel(t)
+	press(m, "/", "q", "?", "s", "tab")
+	if m.quitting || m.help != nil || m.focus != focusTree {
+		t.Fatal("the keys left the prompt")
+	}
+	if got, _ := m.tree.Prompt(); !strings.Contains(got, "q?s") {
+		t.Fatalf("prompt %q", got)
+	}
+}
+
+func TestSidebarTab(t *testing.T) {
+	m := sidebarModel(t)
+	press(m, "tab")
+	if m.focus != focusDoc {
+		t.Fatal("tab did not focus the document")
+	}
+	press(m, "ctrl+e", "shift+tab")
+	if m.focus != focusDoc {
+		t.Fatal("shift+tab did not focus the document")
+	}
+	press(m, "tab") // in the document, tab keeps its meaning
+	if m.focus != focusDoc {
+		t.Fatal("tab left the document")
+	}
+}
+
+func TestSidebarSortSaved(t *testing.T) {
+	var mode string
+	var desc bool
+	m := sidebarModel(t)
+	m.opts.SaveSidebarSort = func(s string, d bool) error { mode, desc = s, d; return nil }
+	m.update(keyOf("s")) // update keeps the queued commands
+	for _, c := range m.cmds {
+		c()
+	}
+	if mode != "time" || !desc || m.cfg.SidebarSort != "time" {
+		t.Fatalf("saved %q %v", mode, desc)
+	}
+	if !strings.Contains(m.tree.Title(), "time ↓") {
+		t.Fatal(m.tree.Title())
+	}
+}
+
+func TestSidebarHints(t *testing.T) {
+	m := sidebarModel(t)
+	if got := m.tree.Hints(); got != "↑↓ move · space open · / filter · s sort · tab document · ? help" {
+		t.Fatal(got)
+	}
+	if !strings.Contains(viewHints, "T theme · ctrl+e sidebar · ? help · q quit") {
+		t.Fatal(viewHints)
+	}
+}
+
 func TestHelpOverlay(t *testing.T) {
 	p := writeTemp(t, "a.md", "x\n", 0o644)
 	m := testModel(t, p)

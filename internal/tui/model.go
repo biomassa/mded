@@ -34,6 +34,7 @@ type Options struct {
 	// The next three are for tests. A nil value gives the real action.
 	SaveTheme        func(name string) error
 	SaveSidebarWidth func(w int) error
+	SaveSidebarSort  func(mode string, desc bool) error
 	OpenURL          func(url string) error
 }
 
@@ -64,6 +65,7 @@ type (
 		err  error
 	}
 	widthSavedMsg struct{ err error }
+	sortSavedMsg  struct{ err error }
 )
 
 // Model is the whole UI state. Its methods change the state in place and put commands in
@@ -177,6 +179,7 @@ func New(o Options) (*Model, error) {
 	if m.tree, err = tree.New(root, cfg.ShowHidden); err != nil {
 		return nil, err
 	}
+	m.tree.SetSort(cfg.SidebarSort, cfg.SidebarSortDesc)
 	if file == "" {
 		m.doc = blankDoc()
 		m.showTree, m.focus = true, focusTree
@@ -242,6 +245,10 @@ func (m *Model) update(msg tea.Msg) {
 			return
 		}
 		m.status("theme "+msg.name+" · saved for the next start", false)
+	case sortSavedMsg:
+		if msg.err != nil {
+			m.status("the sidebar sort was not saved: "+msg.err.Error(), true)
+		}
 	case widthSavedMsg:
 		if msg.err != nil {
 			m.status("the sidebar width was not saved: "+msg.err.Error(), true)
@@ -369,6 +376,7 @@ func (m *Model) key(msg tea.KeyPressMsg) {
 		}
 	}
 	switch {
+	case m.focus == focusTree && !prompt && m.sidebarKey(k):
 	case m.focus == focusTree:
 		m.treeKey(msg)
 	case m.mode == modeView:
@@ -376,6 +384,23 @@ func (m *Model) key(msg tea.KeyPressMsg) {
 	default:
 		m.editKey(msg)
 	}
+}
+
+// sidebarKey handles the keys that the sidebar shares with the app, while no prompt is open:
+// q quits, ? opens the help, and tab moves the focus to the document. It reports if it
+// used the key.
+func (m *Model) sidebarKey(k string) bool {
+	switch k {
+	case "q":
+		m.askQuit()
+	case "?":
+		m.openHelp()
+	case "tab", "shift+tab":
+		m.focusPane(focusDoc)
+	default:
+		return false
+	}
+	return true
 }
 
 // paste handles pasted text and a clipboard answer.
@@ -448,6 +473,14 @@ func (m *Model) treeAction(a tree.Action) {
 		m.status(a.Text, false)
 	case tree.Error:
 		m.status(a.Text, true)
+	case tree.SortChanged:
+		m.cfg.SidebarSort, m.cfg.SidebarSortDesc = a.Text, a.Desc
+		save := m.opts.SaveSidebarSort
+		if save == nil {
+			save = config.SaveSidebarSort
+		}
+		mode, desc := a.Text, a.Desc
+		m.cmd(func() tea.Msg { return sortSavedMsg{err: save(mode, desc)} })
 	}
 }
 

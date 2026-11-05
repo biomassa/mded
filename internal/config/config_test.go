@@ -77,6 +77,25 @@ func TestSaveKeepsOtherKeys(t *testing.T) {
 	}
 }
 
+func TestSidebarSortRoundTrip(t *testing.T) {
+	p := setup(t)
+	write(t, p, "tab_width = 8\n")
+	if c, _ := Load(); c.SidebarSort != "name" || c.SidebarSortDesc {
+		t.Fatalf("defaults %+v", c)
+	}
+	if err := SaveSidebarSort("size", true); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load()
+	if err != nil || c.SidebarSort != "size" || !c.SidebarSortDesc || c.TabWidth != 8 {
+		t.Fatalf("got %+v, %v", c, err)
+	}
+	write(t, p, "sidebar_sort = \"bogus\"\nsidebar_sort_desc = true\n")
+	if c, _ := Load(); c.SidebarSort != "name" || c.SidebarSortDesc {
+		t.Fatalf("bad mode: %+v", c)
+	}
+}
+
 func TestSaveCreatesFile(t *testing.T) {
 	setup(t)
 	if err := SaveTheme("nord"); err != nil {

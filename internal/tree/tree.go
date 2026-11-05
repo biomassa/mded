@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -24,17 +25,44 @@ type ActionKind int
 
 // The kinds of action.
 const (
-	None   ActionKind = iota
-	Open              // open the file in Path
-	Status            // show Text in the status line
-	Error             // show Text as an error
-	Opened            // reserved
+	None        ActionKind = iota
+	Open                   // open the file in Path
+	Status                 // show Text in the status line
+	Error                  // show Text as an error
+	Opened                 // reserved
+	SortChanged            // the sort mode or direction changed: save Text (the mode) and Desc
 )
 
 // Action is the result of a key or a click.
 type Action struct {
 	Kind       ActionKind
 	Path, Text string
+	Desc       bool // for SortChanged: the new direction is descending
+}
+
+// The sort modes of the sidebar. They are also the values of the config key sidebar_sort.
+const (
+	SortName = "name"
+	SortTime = "time"
+	SortSize = "size"
+	SortType = "type"
+)
+
+// sortModes is the order in which the key s goes through the modes.
+var sortModes = []string{SortName, SortTime, SortSize, SortType}
+
+// DefaultDesc reports whether a mode sorts descending by default: the newest and the largest
+// entries come first.
+func DefaultDesc(mode string) bool { return mode == SortTime || mode == SortSize }
+
+// validSort reports whether mode is a sort mode.
+func validSort(mode string) bool {
+	for _, m := range sortModes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
 }
 
 // filterLimit is the maximum number of entries that a filter walk reads.
@@ -61,6 +89,8 @@ type node struct {
 	loaded   bool // the children are read
 	children []*node
 	parent   *node
+	mtime    time.Time // the modification time
+	size     int64
 }
 
 // hidden reports whether the entry is a hidden one.
@@ -76,6 +106,9 @@ type row struct {
 type Tree struct {
 	root       *node
 	showHidden bool
+
+	sortMode string // one of the sort modes
+	sortDesc bool   // the direction of the sort
 
 	filter     string // the active filter text, or ""
 	filterRoot *node  // the filtered copy of the tree, or nil
@@ -108,7 +141,7 @@ func New(root string, showHidden bool) (*Tree, error) {
 	if !st.IsDir() {
 		return nil, fmt.Errorf("%s is not a directory", root)
 	}
-	t := &Tree{showHidden: showHidden, dirty: true, follow: true}
+	t := &Tree{showHidden: showHidden, dirty: true, follow: true, sortMode: SortName}
 	t.root = &node{name: filepath.Base(abs), path: abs, isDir: true, expanded: true}
 	t.cursorPath = abs
 	_ = t.load(t.root)
@@ -130,7 +163,126 @@ func (t *Tree) ShowHidden() bool { return t.showHidden }
 
 // Hints returns the key hints of the sidebar.
 func (t *Tree) Hints() string {
-	return "→ open · / filter · ctrl+n new · F2 rename · del delete · ctrl+h hidden"
+	return "↑↓ move · space open · / filter · s sort · tab document · ? help"
+}
+
+// SetSort sets the sort mode and direction, for example from the config. A bad mode gives
+// the name mode. Call it before the first View.
+func (t *Tree) SetSort(mode string, desc bool) {
+	if !validSort(mode) {
+		mode, desc = SortName, false
+	}
+	t.sortMode, t.sortDesc = mode, desc
+	t.resort()
+}
+
+// Sort returns the sort mode and the direction (true is descending).
+func (t *Tree) Sort() (mode string, desc bool) { return t.sortMode, t.sortDesc }
+
+// cycleSort goes to the next sort mode, with the default direction of that mode.
+func (t *Tree) cycleSort() Action {
+	next := SortName
+	for i, m := range sortModes {
+		if m == t.sortMode {
+			next = sortModes[(i+1)%len(sortModes)]
+		}
+	}
+	t.SetSort(next, DefaultDesc(next))
+	return Action{Kind: SortChanged, Text: next, Desc: t.sortDesc}
+}
+
+// reverseSort reverses the direction of the current sort mode.
+func (t *Tree) reverseSort() Action {
+	t.SetSort(t.sortMode, !t.sortDesc)
+	return Action{Kind: SortChanged, Text: t.sortMode, Desc: t.sortDesc}
+}
+
+// resort sorts all loaded entries again. The cursor stays on its entry, found by its path.
+func (t *Tree) resort() {
+	var walk func(n *node)
+	walk = func(n *node) {
+		t.sortNodes(n.children)
+		for _, c := range n.children {
+			walk(c)
+		}
+	}
+	walk(t.root)
+	if t.filterRoot != nil {
+		walk(t.filterRoot)
+	}
+	t.dirty = true
+	t.vis()
+}
+
+// sortLabel returns the sort mode and an arrow for the direction, for the title.
+func (t *Tree) sortLabel() string {
+	arrow := "↑"
+	if t.sortDesc {
+		arrow = "↓"
+	}
+	return t.sortMode + " " + arrow
+}
+
+// ext returns the lower-case extension of a name, without the dot. A leading dot is no
+// extension.
+func ext(name string) string {
+	e := filepath.Ext(name)
+	if e == name {
+		return ""
+	}
+	return strings.ToLower(strings.TrimPrefix(e, "."))
+}
+
+// nameLess compares two entries by lower-case name, then by name.
+func nameLess(a, b *node) int {
+	if c := strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name)); c != 0 {
+		return c
+	}
+	return strings.Compare(a.name, b.name)
+}
+
+// sortNodes sorts entries in place: directories first, then by the sort mode. Directories
+// sort by name when the mode is size or type, because they have no size and no type.
+func (t *Tree) sortNodes(out []*node) {
+	dir := func(c int) int { // c in the direction of the sort
+		if t.sortDesc {
+			return -c
+		}
+		return c
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.isDir != b.isDir {
+			return a.isDir
+		}
+		c := 0
+		switch t.sortMode {
+		case SortName:
+			return dir(nameLess(a, b)) < 0
+		case SortTime:
+			c = dir(a.mtime.Compare(b.mtime))
+		case SortSize:
+			if !a.isDir {
+				switch {
+				case a.size < b.size:
+					c = dir(-1)
+				case a.size > b.size:
+					c = dir(1)
+				}
+			}
+		case SortType:
+			if !a.isDir {
+				c = dir(strings.Compare(ext(a.name), ext(b.name)))
+				if c == 0 {
+					return dir(nameLess(a, b)) < 0
+				}
+			}
+		}
+		if c != 0 {
+			return c < 0
+		}
+		return nameLess(a, b) < 0 // the tie: by name, ascending
+	})
 }
 
 // Title returns the root path for the pane title.
@@ -143,13 +295,14 @@ func (t *Tree) Title() string {
 			p = "~" + p[len(home):]
 		}
 	}
+	p += " · " + t.sortLabel()
 	if t.filter != "" {
 		p += " · /" + t.filter
 	}
 	return p
 }
 
-// readDir reads the entries of a directory, sorted: directories first, then by lower-case name.
+// readDir reads the entries of a directory, sorted: directories first, then by the sort mode.
 func (t *Tree) readDir(dir string, parent *node) ([]*node, error) {
 	ents, err := os.ReadDir(dir)
 	var out []*node
@@ -159,24 +312,19 @@ func (t *Tree) readDir(dir string, parent *node) ([]*node, error) {
 			continue
 		}
 		isDir := e.IsDir()
+		info, ierr := e.Info()
 		if e.Type()&os.ModeSymlink != 0 {
 			if st, err := os.Stat(filepath.Join(dir, name)); err == nil {
-				isDir = st.IsDir()
+				isDir, info, ierr = st.IsDir(), st, nil
 			}
 		}
-		out = append(out, &node{name: name, path: filepath.Join(dir, name), isDir: isDir, parent: parent})
+		n := &node{name: name, path: filepath.Join(dir, name), isDir: isDir, parent: parent}
+		if ierr == nil {
+			n.mtime, n.size = info.ModTime(), info.Size()
+		}
+		out = append(out, n)
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		a, b := out[i], out[j]
-		if a.isDir != b.isDir {
-			return a.isDir
-		}
-		la, lb := strings.ToLower(a.name), strings.ToLower(b.name)
-		if la != lb {
-			return la < lb
-		}
-		return a.name < b.name
-	})
+	t.sortNodes(out)
 	return out, err
 }
 
@@ -414,7 +562,7 @@ func (t *Tree) Scroll(d int) {
 	t.follow = false
 }
 
-// Click selects row y of the last View. A double click acts like enter.
+// Click selects row y of the last View. A double click toggles a directory or opens a file.
 func (t *Tree) Click(y int, double bool) Action {
 	if t.mode != modeTree {
 		return Action{}
@@ -427,7 +575,7 @@ func (t *Tree) Click(y int, double bool) Action {
 	t.moveTo(i)
 	t.follow = false
 	if double {
-		return t.enter()
+		return t.toggle()
 	}
 	return Action{}
 }
@@ -507,10 +655,22 @@ func (t *Tree) HandleKey(msg tea.KeyPressMsg) (Action, tea.Cmd) {
 		t.moveTo(t.cursor - 1)
 	case "down":
 		t.moveTo(t.cursor + 1)
+	case "pgup":
+		t.moveTo(t.cursor - max(1, t.height-1))
+	case "pgdown":
+		t.moveTo(t.cursor + max(1, t.height-1))
+	case "home":
+		t.moveTo(0)
+	case "end":
+		t.moveTo(len(rows) - 1)
 	case "right":
 		return t.enter(), nil
-	case "enter":
-		return t.enter(), nil
+	case "enter", "space":
+		return t.toggle(), nil
+	case "s":
+		return t.cycleSort(), nil
+	case "S":
+		return t.reverseSort(), nil
 	case "left":
 		t.left()
 	case "/":
@@ -541,6 +701,18 @@ func (t *Tree) HandleKey(msg tea.KeyPressMsg) (Action, tea.Cmd) {
 		t.mode = modeDelete
 	}
 	return Action{}, nil
+}
+
+// toggle opens a closed directory, closes an open one, or opens a file.
+func (t *Tree) toggle() Action {
+	n := t.current()
+	if n.isDir && n.expanded {
+		n.expanded = false
+		t.dirty = true
+		t.vis()
+		return Action{}
+	}
+	return t.enter()
 }
 
 // enter expands a directory or opens a file. On an expanded directory it moves to the first child.
@@ -797,31 +969,56 @@ func (t *Tree) View(w, h int, focused bool) []string {
 // line draws one row.
 func (t *Tree) line(r row, w int, selected, focused bool) string {
 	base := lipgloss.NewStyle()
+	bg := theme.BaseBg
+	if bg == "" {
+		bg = "#000000"
+		if !theme.Dark() {
+			bg = "#FFFFFF"
+		}
+	}
 	if selected {
-		bg := theme.SelBgDim
+		bg = theme.SelBgDim
 		if focused {
 			bg = theme.SelBg
 		}
 		base = base.Background(theme.C(bg))
 	}
+	// The colors are moved until they are readable on the row, also on the selected row.
+	accent := theme.Readable(theme.Fg(theme.Accent), bg, 4.5)
+	muted := theme.Readable(theme.Muted, bg, 4.5)
 	marker := "  "
 	name := r.n.name
-	nameSt := base.Foreground(theme.C(theme.Text))
-	if r.n.isDir {
+	markerSt := base.Foreground(theme.C(muted))
+	var nameSt lipgloss.Style
+	switch {
+	case r.n.isDir:
 		marker = "▸ "
 		if r.n.expanded {
 			marker = "▾ "
 		}
 		name += "/"
-		nameSt = nameSt.Bold(true)
+		markerSt = base.Foreground(theme.C(accent)).Bold(true)
+		nameSt = markerSt
+	case isMarkdown(r.n.name):
+		nameSt = base.Foreground(theme.C(theme.Text))
+	default:
+		nameSt = base.Foreground(theme.C(muted))
 	}
 	switch {
 	case r.n.path == t.openPath && !r.n.isDir:
-		nameSt = base.Foreground(theme.C(theme.Accent))
+		nameSt = base.Foreground(theme.C(accent))
 	case r.n.hidden():
-		nameSt = base.Foreground(theme.C(theme.Dim))
+		nameSt = nameSt.Foreground(theme.C(theme.Dim))
 	}
-	s := base.Render(strings.Repeat(" ", 2*r.depth)) +
-		base.Foreground(theme.C(theme.Muted)).Render(marker) + nameSt.Render(name)
+	s := base.Render(strings.Repeat(" ", 2*r.depth)) + markerSt.Render(marker) + nameSt.Render(name)
 	return ui.Pad(s, w, base)
+}
+
+// isMarkdown reports whether a file name has a markdown extension.
+func isMarkdown(name string) bool {
+	switch ext(name) {
+	case "md", "markdown", "mdown", "mkd":
+		return true
+	}
+	return false
 }

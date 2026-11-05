@@ -5,9 +5,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+
+	"github.com/biomassa/mded/internal/theme"
 )
 
 // key makes a key press message from its name.
@@ -23,6 +26,16 @@ func key(s string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyRight}
 	case "enter":
 		return tea.KeyPressMsg{Code: tea.KeyEnter}
+	case "space":
+		return tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
+	case "pgup":
+		return tea.KeyPressMsg{Code: tea.KeyPgUp}
+	case "pgdown":
+		return tea.KeyPressMsg{Code: tea.KeyPgDown}
+	case "home":
+		return tea.KeyPressMsg{Code: tea.KeyHome}
+	case "end":
+		return tea.KeyPressMsg{Code: tea.KeyEnd}
 	case "esc":
 		return tea.KeyPressMsg{Code: tea.KeyEscape}
 	case "ctrl+n":
@@ -311,27 +324,230 @@ func umask() os.FileMode {
 	return os.FileMode(old)
 }
 
-func TestEnterOnExpandedMovesToChild(t *testing.T) {
+func TestEnterTogglesDirectory(t *testing.T) {
 	d := setup(t)
 	tr, _ := New(d, false)
-	if a := press(tr, "enter"); a.Kind != None || tr.current().name != "A_dir" {
-		t.Fatalf("root: %+v on %s", a, tr.current().name)
-	}
-	press(tr, "down", "right") // b_dir, expand
+	press(tr, "down", "down") // b_dir
 	press(tr, "enter")
+	if len(tr.vis()) != 7 || tr.current().name != "b_dir" {
+		t.Fatalf("open: %v, cursor on %s", names(tr), tr.current().name)
+	}
+	press(tr, "right") // an open directory: right goes to the first child
 	if tr.current().name != "inner" {
+		t.Fatalf("right: cursor on %s", tr.current().name)
+	}
+	press(tr, "left", "space") // back on b_dir, close
+	if len(tr.vis()) != 5 || tr.current().name != "b_dir" {
+		t.Fatalf("close: %v", names(tr))
+	}
+	press(tr, "space")
+	if len(tr.vis()) != 7 {
+		t.Fatalf("space opens: %v", names(tr))
+	}
+	tr.moveTo(4) // note.md
+	if a := press(tr, "space"); a.Kind != Open || filepath.Base(a.Path) != "note.md" {
+		t.Fatalf("space on a file: %+v", a)
+	}
+}
+
+func TestDoubleClickToggles(t *testing.T) {
+	d := setup(t)
+	tr, _ := New(d, false)
+	tr.View(30, 10, true)
+	tr.Click(2, true) // b_dir
+	if len(tr.vis()) != 7 {
+		t.Fatalf("open: %v", names(tr))
+	}
+	tr.Click(2, true)
+	if len(tr.vis()) != 5 {
+		t.Fatalf("close: %v", names(tr))
+	}
+}
+
+func TestPageHomeEnd(t *testing.T) {
+	d := t.TempDir()
+	for i := 0; i < 30; i++ {
+		os.WriteFile(filepath.Join(d, "f"+string(rune('a'+i%26))+string(rune('a'+i/26))+".txt"), nil, 0o644)
+	}
+	tr, _ := New(d, false)
+	tr.View(30, 10, true)
+	press(tr, "pgdown")
+	if tr.cursor != 9 {
+		t.Fatalf("pgdown: %d", tr.cursor)
+	}
+	press(tr, "pgup")
+	if tr.cursor != 0 {
+		t.Fatalf("pgup: %d", tr.cursor)
+	}
+	press(tr, "end")
+	if tr.cursor != len(tr.vis())-1 {
+		t.Fatalf("end: %d", tr.cursor)
+	}
+	press(tr, "home")
+	if tr.cursor != 0 {
+		t.Fatalf("home: %d", tr.cursor)
+	}
+	tr.height = 0
+	press(tr, "pgdown") // the page is at least one row
+	if tr.cursor != 1 {
+		t.Fatalf("small pgdown: %d", tr.cursor)
+	}
+}
+
+// sortSetup makes a directory with files of known time, size, and type.
+func sortSetup(t *testing.T) string {
+	d := t.TempDir()
+	now := time.Now()
+	files := []struct {
+		name string
+		size int
+		age  time.Duration
+	}{
+		{"b.txt", 10, 3 * time.Hour},
+		{"a.go", 300, 1 * time.Hour},
+		{"C.GO", 20, 2 * time.Hour},
+		{"d.md", 5, 4 * time.Hour},
+	}
+	for _, f := range files {
+		p := filepath.Join(d, f.name)
+		os.WriteFile(p, make([]byte, f.size), 0o644)
+		os.Chtimes(p, now, now.Add(-f.age))
+	}
+	os.Mkdir(filepath.Join(d, "zdir"), 0o755)
+	os.Mkdir(filepath.Join(d, "adir"), 0o755)
+	old := now.Add(-48 * time.Hour)
+	os.Chtimes(filepath.Join(d, "adir"), old, old)
+	return d
+}
+
+func TestSortModes(t *testing.T) {
+	d := sortSetup(t)
+	root := filepath.Base(d)
+	tr, _ := New(d, false)
+	if m, desc := tr.Sort(); m != SortName || desc {
+		t.Fatal("default sort")
+	}
+	eq(t, names(tr), root, "adir", "zdir", "a.go", "b.txt", "C.GO", "d.md")
+	if !strings.HasSuffix(tr.Title(), " · name ↑") {
+		t.Fatal(tr.Title())
+	}
+	a := press(tr, "s")
+	if a.Kind != SortChanged || a.Text != SortTime || !a.Desc {
+		t.Fatalf("action %+v", a)
+	}
+	eq(t, names(tr), root, "zdir", "adir", "a.go", "C.GO", "b.txt", "d.md")
+	if !strings.HasSuffix(tr.Title(), " · time ↓") {
+		t.Fatal(tr.Title())
+	}
+	a = press(tr, "S")
+	if a.Kind != SortChanged || a.Text != SortTime || a.Desc {
+		t.Fatalf("action %+v", a)
+	}
+	eq(t, names(tr), root, "adir", "zdir", "d.md", "b.txt", "C.GO", "a.go")
+	press(tr, "s") // size: the default direction of the mode
+	if m, desc := tr.Sort(); m != SortSize || !desc {
+		t.Fatalf("size %v %v", m, desc)
+	}
+	eq(t, names(tr), root, "adir", "zdir", "a.go", "C.GO", "b.txt", "d.md")
+	press(tr, "S")
+	eq(t, names(tr), root, "adir", "zdir", "d.md", "b.txt", "C.GO", "a.go")
+	press(tr, "s") // type: ascending, by extension (case-insensitive), then name
+	if m, desc := tr.Sort(); m != SortType || desc {
+		t.Fatalf("type %v %v", m, desc)
+	}
+	eq(t, names(tr), root, "adir", "zdir", "a.go", "C.GO", "d.md", "b.txt")
+	if !strings.HasSuffix(tr.Title(), " · type ↑") {
+		t.Fatal(tr.Title())
+	}
+	press(tr, "S")
+	eq(t, names(tr), root, "adir", "zdir", "b.txt", "d.md", "C.GO", "a.go")
+	press(tr, "s")
+	if m, desc := tr.Sort(); m != SortName || desc {
+		t.Fatalf("name %v %v", m, desc)
+	}
+}
+
+func TestSortKeepsCursorAndFilterTitle(t *testing.T) {
+	d := sortSetup(t)
+	tr, _ := New(d, false)
+	press(tr, "end") // d.md
+	press(tr, "s")
+	if tr.current().name != "d.md" {
 		t.Fatalf("cursor on %s", tr.current().name)
 	}
-	empty := filepath.Join(d, "A_dir", "empty")
-	os.Mkdir(empty, 0o755)
-	tr.Refresh()
-	tr.reveal(empty)
-	tr.cursorPath = empty
-	tr.vis()
-	press(tr, "enter") // expand the empty directory
+	press(tr, "/")
+	typ(tr, "go")
+	if !strings.HasSuffix(tr.Title(), " · time ↓ · /go") {
+		t.Fatal(tr.Title())
+	}
 	press(tr, "enter")
-	if tr.current().name != "empty" {
-		t.Fatalf("cursor on %s", tr.current().name)
+	press(tr, "S")
+	eq(t, names(tr), filepath.Base(d), "C.GO", "a.go")
+}
+
+func TestSortSetAndBadMode(t *testing.T) {
+	tr, _ := New(t.TempDir(), false)
+	tr.SetSort(SortSize, false)
+	if m, desc := tr.Sort(); m != SortSize || desc {
+		t.Fatal("set")
+	}
+	tr.SetSort("bogus", true)
+	if m, desc := tr.Sort(); m != SortName || desc {
+		t.Fatal("bad mode")
+	}
+}
+
+func TestSortKeysInPromptAreText(t *testing.T) {
+	d := sortSetup(t)
+	tr, _ := New(d, false)
+	press(tr, "/")
+	typ(tr, "sS")
+	if m, _ := tr.Sort(); m != SortName || tr.filter != "sS" {
+		t.Fatalf("mode %s filter %q", m, tr.filter)
+	}
+}
+
+func TestColorsAndReadability(t *testing.T) {
+	d := setup(t)
+	os.WriteFile(filepath.Join(d, "x.go"), nil, 0o644)
+	os.WriteFile(filepath.Join(d, "x.md"), nil, 0o644)
+	tr, _ := New(d, true)
+	tr.View(40, 12, false)
+	row := func(name string) string {
+		for _, r := range tr.vis() {
+			if r.n.name == name {
+				return tr.line(r, 40, false, false)
+			}
+		}
+		t.Fatalf("no row %s", name)
+		return ""
+	}
+	dir, md, other, hid := row("A_dir"), row("x.md"), row("x.go"), row(".dot")
+	if md == other || dir == md || hid == other {
+		t.Fatal("the rows have the same style")
+	}
+	// The accent and the muted color stay readable on the selected row in all themes.
+	for _, name := range theme.Names() {
+		theme.Apply(name, true)
+		for _, bg := range []string{theme.SelBg, theme.SelBgDim, theme.BaseBg} {
+			if bg == "" {
+				continue
+			}
+			for _, c := range []string{theme.Fg(theme.Accent), theme.Muted} {
+				if r := theme.Readable(c, bg, 4.5); theme.Contrast(r, bg) < 3 {
+					t.Errorf("theme %s: contrast %.1f of %s on %s", name, theme.Contrast(r, bg), r, bg)
+				}
+			}
+		}
+	}
+	theme.Apply("default", true)
+}
+
+func TestIsMarkdown(t *testing.T) {
+	for n, want := range map[string]bool{"a.md": true, "A.MD": true, "b.Markdown": true, "c.mdown": true, "d.mkd": true, "e.txt": false, "md": false, ".md": false} {
+		if isMarkdown(n) != want {
+			t.Errorf("%s: want %v", n, want)
+		}
 	}
 }
 
