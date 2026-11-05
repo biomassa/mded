@@ -1,6 +1,7 @@
 package markdown
 
 import (
+	"sort"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -106,67 +107,89 @@ func (o LayoutOpts) imageRows(l []rune, i int) (rows []Row, alone bool) {
 	return rows, alone
 }
 
-// Layout builds all rows of a document. The UI does the scrolling. A line that AsSource
-// accepts shows as source. Another line shows as preview rows from the cache, and a fenced
-// block or a table shows as rendered rows. An image on a line that does not show source
-// gets image rows: in place of the line if it is alone on the line, else below it.
-func (c *Cache) Layout(lines [][]rune, o LayoutOpts) []Row {
+// Unit returns the first and the last line of the layout unit of line i: the block (a
+// fenced code block or a table) that has line i, or line i alone. blocks must be in the
+// order of their lines, as Blocks returns them. The rows of a unit come only as a whole.
+func Unit(blocks []Block, i int) (from, to int) {
+	if b, ok := blockOf(blocks, i); ok {
+		return b.From, b.To
+	}
+	return i, i
+}
+
+// blockOf returns the block that has line i.
+func blockOf(blocks []Block, i int) (Block, bool) {
+	k := sort.Search(len(blocks), func(k int) bool { return blocks[k].From > i }) - 1
+	if k >= 0 && i <= blocks[k].To {
+		return blocks[k], true
+	}
+	return Block{}, false
+}
+
+// UnitRows builds the rows of the unit that starts at line from (see Unit). A line that
+// AsSource accepts shows as source. Another line shows as preview rows from the cache, and a
+// block shows as rendered rows. A block with one line that AsSource accepts shows all its
+// lines as source. An image on a line that does not show source gets image rows: in place
+// of the line if it is alone on the line, else below it.
+func (c *Cache) UnitRows(lines [][]rune, o LayoutOpts, blocks []Block, from int) []Row {
 	o.Width = max(1, o.Width)
 	asSource := func(i int) bool { return o.AsSource != nil && o.AsSource(i) }
-	var rows []Row
+	if from < 0 || from >= len(lines) {
+		return nil
+	}
 	if o.Plain {
-		for i, l := range lines {
-			rows = append(rows, o.sourceRows(l, i, false)...)
+		return o.sourceRows(lines[from], from, false)
+	}
+	if b, ok := blockOf(blocks, from); ok && b.From == from {
+		src := false
+		for i := b.From; i <= b.To && !src; i++ {
+			src = asSource(i)
+		}
+		var rows []Row
+		if src {
+			for i := b.From; i <= b.To; i++ {
+				// In a fenced block, the lines after the opening fence have the code style.
+				rows = append(rows, o.sourceRows(lines[i], i, !b.Table && i > b.From)...)
+			}
+			return rows
+		}
+		first, last := codeLines(lines, b)
+		for k, r := range c.BlockRows(lines, b, o.Width) {
+			if !b.Table { // a code block row: its source line, for a click and a copy
+				r.Line = max(first, min(first+k, last))
+			}
+			rows = append(rows, r)
 		}
 		return rows
 	}
-	blockAt := map[int]Block{} // first line → block
-	inBlock := make([]bool, len(lines))
-	blockSrc := map[int]bool{} // first line → the block shows source
-	for _, b := range Blocks(lines) {
-		blockAt[b.From] = b
-		for i := b.From; i <= b.To; i++ {
-			inBlock[i] = true
-			if asSource(i) {
-				blockSrc[b.From] = true
-			}
-		}
+	l := lines[from]
+	if asSource(from) {
+		return o.sourceRows(l, from, false)
 	}
-	cur := Block{From: -1, To: -1} // the block of the line in the loop
-	fence := false                 // for the source styles: the line is in a fenced block
-	for i, l := range lines {
-		if b, ok := blockAt[i]; ok {
-			cur = b
-		}
-		src := blockSrc[cur.From] && i >= cur.From && i <= cur.To || !inBlock[i] && asSource(i)
-		switch {
-		case src:
-			rows = append(rows, o.sourceRows(l, i, fence)...)
-		case inBlock[i]:
-			if b, first := blockAt[i]; first { // the block rows come with its first line
-				first, last := codeLines(lines, b)
-				for k, r := range c.BlockRows(lines, b, o.Width) {
-					if !b.Table { // a code block row: its source line, for a click and a copy
-						r.Line = max(first, min(first+k, last))
-					}
-					rows = append(rows, r)
-				}
-			}
-		default:
-			img, alone := o.imageRows(l, i)
-			if alone {
-				rows = append(rows, img...)
-				break
-			}
-			for _, r := range c.PreviewRows(string(l), o.Width) {
-				r.Line = i
-				rows = append(rows, r)
-			}
-			rows = append(rows, img...)
-		}
-		if isFence(l) {
-			fence = !fence
-		}
+	img, alone := o.imageRows(l, from)
+	if alone {
+		return img
+	}
+	var rows []Row
+	for _, r := range c.PreviewRows(string(l), o.Width) {
+		r.Line = from
+		rows = append(rows, r)
+	}
+	return append(rows, img...)
+}
+
+// Layout builds all rows of a document: the rows of all units, in order. The UI builds only
+// the rows on the screen (see UnitRows). Layout is for tests and small documents.
+func (c *Cache) Layout(lines [][]rune, o LayoutOpts) []Row {
+	var blocks []Block
+	if !o.Plain {
+		blocks = Blocks(lines)
+	}
+	var rows []Row
+	for i := 0; i < len(lines); {
+		_, to := Unit(blocks, i)
+		rows = append(rows, c.UnitRows(lines, o, blocks, i)...)
+		i = to + 1
 	}
 	return rows
 }
