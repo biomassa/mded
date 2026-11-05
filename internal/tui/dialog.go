@@ -24,6 +24,19 @@ func (m *Model) dialogText() (question, keys string) {
 	return "Save changes to " + m.doc.title() + "?", "s save · d discard · esc cancel"
 }
 
+// revert gives d the text of its file again, or the empty text if the file does not exist
+// or cannot be read. The buffer keeps no copy of the saved text, so the file is read again.
+func (m *Model) revert(d *doc) {
+	if d.exists {
+		if nd, err := loadDoc(d.path); err == nil && !nd.image {
+			d.buf.SetText(nd.buf.Text())
+			d.crlf, d.finalNL = nd.crlf, nd.finalNL
+			return
+		}
+	}
+	d.buf.SetText("")
+}
+
 // dialogKey handles a key while the dialog is open. Other keys do nothing.
 func (m *Model) dialogKey(k string) {
 	dlg := m.dlg
@@ -37,8 +50,7 @@ func (m *Model) dialogKey(k string) {
 		}
 	case "d":
 		m.dlg = nil
-		d := m.doc
-		d.buf.SetText(d.buf.Saved) // the discard also matters for a document in the link history
+		m.revert(m.doc) // the discard also matters for a document in the link history
 		dlg.then()
 	case "esc":
 		m.dlg = nil

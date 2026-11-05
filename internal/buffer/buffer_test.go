@@ -442,8 +442,8 @@ func TestDirtyAndSave(t *testing.T) {
 	}
 	b.Redo()
 	b.MarkSaved()
-	if b.Dirty() || b.Saved != "xa\nb" {
-		t.Errorf("after save: %v %q", b.Dirty(), b.Saved)
+	if b.Dirty() || b.Text() != "xa\nb" {
+		t.Errorf("after save: %v %q", b.Dirty(), b.Text())
 	}
 	b.SetText("new")
 	if b.UndoDepth() != 0 || b.Text() != "new" || b.Dirty() {
@@ -472,5 +472,66 @@ func TestLineImmutableUndo(t *testing.T) {
 	}
 	if b.Text() != "abc" {
 		t.Errorf("text after undo = %q", b.Text())
+	}
+}
+
+// An undo step keeps only the lines that it changed, also in a large buffer. Undo and
+// redo of many steps give the texts back.
+func TestUndoKeepsOnlyChangedLines(t *testing.T) {
+	var sb strings.Builder
+	for i := 0; i < 50000; i++ {
+		sb.WriteString("line\n")
+	}
+	b := New(sb.String())
+	want := []string{b.Text()}
+	for i := 0; i < 30; i++ {
+		b.MoveTo(i*1000, 0)
+		b.PushUndo(false)
+		b.Insert([]rune("x"))
+		want = append(want, b.Text())
+	}
+	b.closeOpen()
+	for i, p := range b.undo {
+		if len(p.old) > 1 || p.n > 1 {
+			t.Fatalf("step %d keeps %d old lines for %d new lines", i, len(p.old), p.n)
+		}
+	}
+	for i := len(want) - 2; i >= 0; i-- {
+		b.Undo()
+		if b.Text() != want[i] {
+			t.Fatalf("undo to step %d: wrong text", i)
+		}
+	}
+	for i := 1; i < len(want); i++ {
+		b.Redo()
+		if b.Text() != want[i] {
+			t.Fatalf("redo to step %d: wrong text", i)
+		}
+	}
+}
+
+// Dirty uses the version of the text: an edit makes the text dirty, the undo of it makes the
+// text clean, and a second edit that takes the first one back by hand does not.
+func TestDirtyByVersion(t *testing.T) {
+	b := New("ab")
+	b.MoveTo(0, 2)
+	b.PushUndo(false)
+	b.Insert([]rune("c"))
+	if !b.Dirty() {
+		t.Fatal("not dirty after an edit")
+	}
+	b.PushUndo(false)
+	b.Backspace()
+	if !b.Dirty() || b.Text() != "ab" {
+		t.Error("a hand-made revert must stay dirty")
+	}
+	b.Undo()
+	b.Undo()
+	if b.Dirty() || b.Text() != "ab" {
+		t.Errorf("undo to the saved text: dirty %v text %q", b.Dirty(), b.Text())
+	}
+	b.Redo()
+	if !b.Dirty() {
+		t.Error("redo after the saved text must be dirty")
 	}
 }

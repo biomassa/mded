@@ -3,7 +3,7 @@
 //
 // One rule keeps undo cheap: code never changes a line in place. A line is a []rune that
 // the buffer treats as immutable. To change a line, build a new slice and call SetLine.
-// An undo step then copies only the slice of line headers.
+// An undo step then keeps only the lines that it changed.
 package buffer
 
 import "strings"
@@ -11,20 +11,12 @@ import "strings"
 // undoLimit is the number of undo steps that the buffer keeps.
 const undoLimit = 200
 
-// state is one undo step: the lines and the cursor.
-type state struct {
-	lines    [][]rune
-	row, col int
-	aux      any // the value of OnSnap at the time of the snapshot
-}
-
 // Buffer is the text of one document with its cursor, selection, undo, and search state.
 type Buffer struct {
 	Lines    [][]rune // always at least one line
 	Row, Col int      // cursor: line and rune in the line
 	Want     int      // column that up/down try to keep, -1 for none
 	Off      int      // first visible screen line. The UI owns this field.
-	Saved    string   // text at the last save or load
 	Rev      int      // change counter. It grows with each change of the text.
 
 	// The selection goes from the anchor SelRow, SelCol to the cursor.
@@ -47,13 +39,16 @@ type Buffer struct {
 	OnSnap    func() any
 	OnRestore func(any)
 
-	undo, redo []state
-	typing     bool  // the last change was typing, so the next letter joins its undo step
-	depth      int   // nesting of BeginChange
-	begin      state // snapshot at the outermost BeginChange
+	undo, redo []patch
+	open       *state // the start of the undo step that is open, or nil
+	typing     bool   // the last change was typing, so the next letter joins its undo step
+	depth      int    // nesting of BeginChange
+	begin      state  // snapshot at the outermost BeginChange
 	beginRev   int
-	dirtyRev   int // Rev for which dirtyVal is valid
-	dirtyVal   bool
+	// ver is the version of the text: each change gives a new number, and undo and redo
+	// give back the number of the text that they restore. savedVer is the version at the
+	// last save or load. Thus Dirty needs no copy of the saved text.
+	ver, verSeq, savedVer int
 }
 
 // Shift describes an edit that moved lines. N above 0 means that N lines came in before
@@ -86,10 +81,9 @@ func (b *Buffer) SetText(text string) {
 	b.Lines = splitRunes(text)
 	b.Row, b.Col, b.Want, b.Off = 0, 0, -1, 0
 	b.SelOn, b.SelLinewise, b.SelInclusive = false, false, false
-	b.undo, b.redo, b.typing, b.depth = nil, nil, false, 0
-	b.Saved = text
+	b.undo, b.redo, b.open, b.typing, b.depth = nil, nil, nil, false, 0
 	b.touch()
-	b.dirtyRev = -1
+	b.savedVer = b.ver
 	b.Refresh()
 }
 
@@ -111,23 +105,19 @@ func (b *Buffer) Text() string {
 	return strings.Join(parts, "\n")
 }
 
-// Dirty reports whether the text differs from the saved text.
-func (b *Buffer) Dirty() bool {
-	if b.dirtyRev != b.Rev {
-		b.dirtyVal = b.Text() != b.Saved
-		b.dirtyRev = b.Rev
-	}
-	return b.dirtyVal
-}
+// Dirty reports whether the text changed after the last save or load. A change and its
+// undo give a clean text again. A change that a second change takes back by hand does not.
+func (b *Buffer) Dirty() bool { return b.ver != b.savedVer }
 
 // MarkSaved records the current text as the saved text.
-func (b *Buffer) MarkSaved() {
-	b.Saved = b.Text()
-	b.dirtyRev = -1
-}
+func (b *Buffer) MarkSaved() { b.savedVer = b.ver }
 
-// touch counts a change of the text.
-func (b *Buffer) touch() { b.Rev++ }
+// touch counts a change of the text and gives the text a new version.
+func (b *Buffer) touch() {
+	b.Rev++
+	b.verSeq++
+	b.ver = b.verSeq
+}
 
 // LineCount returns the number of lines.
 func (b *Buffer) LineCount() int { return len(b.Lines) }
