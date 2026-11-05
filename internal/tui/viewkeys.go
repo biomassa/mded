@@ -44,9 +44,9 @@ func (m *Model) viewKey(msg tea.KeyPressMsg) {
 	case "b", "pgup":
 		d.off -= max(1, th-1)
 	case "g", "home":
-		d.off = 0
+		d.top, d.sub, d.off = 0, 0, 0
 	case "G", "end":
-		d.off = len(m.rows)
+		d.toEnd = true
 	case "/":
 		m.startSearch()
 	case "n", "N":
@@ -137,7 +137,7 @@ func (m *Model) bottomLine() int {
 	if len(m.rows) == 0 {
 		return 0
 	}
-	return m.rows[min(len(m.rows)-1, m.doc.off+m.textH()-1)].Line
+	return m.rows[min(len(m.rows)-1, m.textH()-1)].Line
 }
 
 // toggleItem changes a checkbox. The document becomes modified, and edit mode can undo it.

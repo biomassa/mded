@@ -133,9 +133,13 @@ type Model struct {
 	msgSeq int
 
 	// The layout, built at the end of each Update.
-	rows   []markdown.Row
-	lk     layoutKey
-	laid   bool
+	rows []markdown.Row // the rows on the screen, from the anchor of the view down
+	lo   markdown.LayoutOpts
+	// blk holds the code blocks and tables of blkDoc at the version blkRev.
+	blk    []markdown.Block
+	blkDoc *doc
+	blkRev int
+	blkOK  bool
 	placed map[int]placedImage
 
 	imgTried map[string]bool // image files that a load started for
@@ -573,7 +577,7 @@ func (m *Model) setDoc(d *doc) {
 	m.mode = modeView
 	m.vsel = viewSel{}
 	m.find, m.search = nil, nil
-	m.itemSel, m.srchPos, m.laid = -1, false, false
+	m.itemSel, m.srchPos = -1, false
 	m.follow = false
 	if d.abs != "" {
 		m.tree.SetOpen(d.abs)
@@ -656,7 +660,6 @@ func (m *Model) write(path string) bool {
 	d.buf.MarkSaved()
 	m.tree.Refresh()
 	m.tree.SetOpen(d.abs)
-	m.laid = false
 	m.status("saved "+path, false)
 	return true
 }
@@ -890,13 +893,13 @@ func (m *Model) editKey(msg tea.KeyPressMsg) {
 
 // topLine returns the source line at the top of the pane.
 func (m *Model) topLine() int {
-	for i := m.doc.off; i < len(m.rows); i++ {
-		if m.rows[i].Img == nil {
-			return m.rows[i].Line
+	for _, r := range m.rows {
+		if r.Img == nil {
+			return r.Line
 		}
 	}
 	if len(m.rows) > 0 {
-		return m.rows[min(m.doc.off, len(m.rows)-1)].Line
+		return m.rows[0].Line
 	}
-	return 0
+	return m.doc.top
 }

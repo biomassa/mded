@@ -92,11 +92,15 @@ func TestCursorWrappedLineAndScroll(t *testing.T) {
 	}
 	dr := m.docRect()
 	want := dr.x + 3 + len(last.Cells) // the border, the margin, the indent
-	if c.X != want || c.Y != 1+cy-m.doc.off {
-		t.Errorf("cursor %d,%d want %d,%d", c.X, c.Y, want, 1+cy-m.doc.off)
+	if c.X != want || c.Y != 1+cy {
+		t.Errorf("cursor %d,%d want %d,%d", c.X, c.Y, want, 1+cy)
 	}
 	// A cursor row that is out of the pane gives no cursor.
-	m.doc.off = len(m.rows) - 1
+	m.doc.toEnd = true
+	m.Update(tea.WindowSizeMsg{Width: 50, Height: 12})
+	if onScreen(m, 0) {
+		t.Fatal("the end of the document did not scroll the first line out")
+	}
 	if m.View().Cursor != nil {
 		t.Error("a row that is scrolled out must have no cursor")
 	}

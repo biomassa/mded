@@ -255,15 +255,16 @@ func TestSelectDragScrolls(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 60, Height: 12})
 	m.Update(tea.MouseClickMsg{X: 3, Y: 2, Button: tea.MouseLeft})
 	m.Update(tea.MouseMotionMsg{X: 3, Y: 11, Button: tea.MouseLeft}) // below the text
-	if m.doc.off != 1 {
-		t.Errorf("off %d", m.doc.off)
+	// The document has one row per line, so the top line is the scroll position.
+	if m.topLine() != 1 {
+		t.Errorf("top line %d", m.topLine())
 	}
 	m.Update(tea.MouseWheelMsg{X: 3, Y: 5, Button: tea.MouseWheelDown})
-	if m.doc.off != 4 || m.vsel.h.row != 4+4 {
-		t.Errorf("wheel: off %d head %+v", m.doc.off, m.vsel.h)
+	if m.topLine() != 4 || m.vsel.h.s.line != 4+4 {
+		t.Errorf("wheel: top line %d head %+v", m.topLine(), m.vsel.h)
 	}
 	m.Update(tea.MouseMotionMsg{X: 3, Y: 0, Button: tea.MouseLeft}) // above the text
-	if m.doc.off != 3 {
-		t.Errorf("off %d", m.doc.off)
+	if m.topLine() != 3 {
+		t.Errorf("top line %d", m.topLine())
 	}
 }

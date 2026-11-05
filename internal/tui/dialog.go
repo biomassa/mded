@@ -65,7 +65,8 @@ type searchPrompt struct {
 	prev    buffer.Search // the search before the prompt
 	row     int           // the start position of the search
 	col     int
-	off     int // the scroll position before the prompt
+	top     int // the view before the prompt: its anchor (see relayout)
+	sub     int
 	hist    int // position in the history, len(history) for the new text
 	draft   string
 	note    string // problem with the pattern, in the status line
@@ -91,7 +92,7 @@ func (m *Model) startSearch() {
 	top := m.topLine()
 	b.MoveTo(top, 0)
 	m.srchPos = true
-	m.search = &searchPrompt{prev: b.Search, row: top, col: 0, off: d.off, hist: len(m.searchHist)}
+	m.search = &searchPrompt{prev: b.Search, row: top, col: 0, top: d.top, sub: d.sub, hist: len(m.searchHist)}
 }
 
 // searchKey handles a key in the search prompt.
@@ -104,7 +105,7 @@ func (m *Model) searchKey(msg tea.KeyPressMsg) {
 		d := m.doc
 		d.buf.Search = s.prev
 		d.buf.MoveTo(s.row, s.col)
-		d.off = s.off
+		d.top, d.sub = s.top, s.sub
 		m.search = nil
 		return
 	case "enter":

@@ -39,7 +39,10 @@ type doc struct {
 	// editRow and editCol are the cursor of the last edit session. View mode moves the
 	// buffer cursor for the search, so the edit position needs its own place.
 	editRow, editCol int
-	off              int // first visible screen row
+	// The view starts at line top, at row sub of the rows of its unit (see relayout). off
+	// is a scroll request in rows that relayout carries out, and toEnd asks for the end.
+	top, sub, off int
+	toEnd         bool
 }
 
 // markdownExt lists the file extensions that open as markdown.

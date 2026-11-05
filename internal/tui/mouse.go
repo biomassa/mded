@@ -101,7 +101,7 @@ func (m *Model) rowAt(y int) int {
 	if r < 0 || r >= m.textH() {
 		return -1
 	}
-	return m.doc.off + r
+	return r
 }
 
 // posAt returns the source line and rune under a cell of the text. src is the rune of the
@@ -282,7 +282,8 @@ func (m *Model) mouseWheel(ms tea.Mouse) {
 	case m.help != nil:
 		m.help.off += d
 	case m.vsel.drag: // a drag in the view: the pane scrolls, and the selection follows the pointer
-		m.doc.off = m.clampOff(m.doc.off + d)
+		m.doc.off += d
+		m.relayout() // the point under the pointer is on the new screen
 		m.viewDrag(ms.X, ms.Y)
 	case m.treeRect().has(ms.X, ms.Y):
 		m.tree.Scroll(d)

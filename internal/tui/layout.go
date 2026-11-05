@@ -2,9 +2,11 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/biomassa/mded/internal/buffer"
 	"github.com/biomassa/mded/internal/markdown"
 	"github.com/biomassa/mded/internal/theme"
 	"github.com/biomassa/mded/internal/ui"
@@ -55,63 +57,26 @@ type matchSpan struct {
 	cur  bool
 }
 
-// layoutKey holds everything that changes the rows. When it stays the same, the rows of the
-// last layout are good.
-type layoutKey struct {
-	doc                   *doc
-	rev                   int
-	mode                  mode
-	row, col              int
-	selOn, selLW, selIncl bool
-	selRow, selCol        int
-	pattern               string
-	hl                    bool
-	cur, nMatch           int
-	findOpen              bool
-	findCur, findN        int
-	itemSel               int
-	tw, th                int
-	themeGen, imgGen      int
-	plain                 bool
-	focus                 focusPane
-	vsel                  viewSel
-}
-
-func (m *Model) layoutKey(tw, th int) layoutKey {
-	d := m.doc
-	b := d.buf
-	k := layoutKey{
-		doc: d, rev: b.Rev, mode: m.mode, itemSel: m.itemSel, tw: tw, th: th,
-		themeGen: m.themeGen, imgGen: m.imgGen, plain: d.plain, focus: m.focus,
-		pattern: b.Search.Pattern, hl: b.Search.Highlight, cur: b.Search.Cur, nMatch: len(b.Search.Matches),
-	}
-	if m.mode == modeEdit {
-		k.row, k.col = b.Row, b.Col
-		k.selOn, k.selLW, k.selIncl, k.selRow, k.selCol = b.SelOn, b.SelLinewise, b.SelInclusive, b.SelRow, b.SelCol
-	}
-	if m.mode == modeView && m.vsel.on {
-		k.vsel = viewSel{on: true, a: m.vsel.a, h: m.vsel.h}
-	}
-	if m.find != nil {
-		k.findOpen, k.findCur, k.findN = true, m.find.Cur, len(m.find.Matches)
-	}
-	return k
-}
-
-// matchSpans returns the matches to highlight, by line: the matches of the find box while
-// it is open, else the matches of the search while the highlight is on.
-func (m *Model) matchSpans() map[int][]matchSpan {
+// spansFor returns the matches to highlight in a source line: the matches of the find box
+// while it is open, else the matches of the search while the highlight is on. The matches are
+// in text order, so a binary search finds the line. Thus the cost does not grow with the
+// number of matches in the document.
+func (m *Model) spansFor(line int) []matchSpan {
 	b := m.doc.buf
-	out := map[int][]matchSpan{}
+	var ms []buffer.Match
+	cur := -1
 	switch {
 	case m.find != nil:
-		for i, mt := range m.find.Matches {
-			out[mt.Row] = append(out[mt.Row], matchSpan{mt.A, mt.B, i == m.find.Cur})
-		}
+		ms, cur = m.find.Matches, m.find.Cur
 	case b.Search.Highlight:
-		for i, mt := range b.Search.Matches {
-			out[mt.Row] = append(out[mt.Row], matchSpan{mt.A, mt.B, i == b.Search.Cur})
-		}
+		ms, cur = b.Search.Matches, b.Search.Cur
+	default:
+		return nil
+	}
+	k := sort.Search(len(ms), func(k int) bool { return ms[k].Row >= line })
+	var out []matchSpan
+	for ; k < len(ms) && ms[k].Row == line; k++ {
+		out = append(out, matchSpan{ms[k].A, ms[k].B, k == cur})
 	}
 	return out
 }
@@ -130,16 +95,12 @@ func selectionStyle(st lipgloss.Style) lipgloss.Style {
 	return st.Background(theme.C(theme.SelBg)).Foreground(theme.C(theme.Text))
 }
 
-// buildRows makes the rows of the document for the current state.
-func (m *Model) buildRows(tw, th int) []markdown.Row {
+// layoutOpts returns the layout options for the current state.
+func (m *Model) layoutOpts(tw int) markdown.LayoutOpts {
 	d := m.doc
-	if d.image {
-		return m.imageDocRows(tw, th)
-	}
 	b := d.buf
 	editing := m.mode == modeEdit
-	spans := m.matchSpans()
-	o := markdown.LayoutOpts{
+	return markdown.LayoutOpts{
 		Width:     tw,
 		Plain:     d.plain,
 		ImageSize: m.imageSize,
@@ -147,14 +108,14 @@ func (m *Model) buildRows(tw, th int) []markdown.Row {
 			if editing && (m.find != nil || i == b.Row || b.SelLine(i)) {
 				return true
 			}
-			return len(spans[i]) > 0
+			return len(m.spansFor(i)) > 0
 		},
 		Decorate: func(line, col int, st *lipgloss.Style) *lipgloss.Style {
 			if editing && b.InSel(line, col) {
 				s := selectionStyle(*st)
 				return &s
 			}
-			for _, s := range spans[line] {
+			for _, s := range m.spansFor(line) {
 				if col >= s.a && col < s.b {
 					ms := matchStyle(*st, s.cur)
 					return &ms
@@ -163,21 +124,161 @@ func (m *Model) buildRows(tw, th int) []markdown.Row {
 			return st
 		},
 	}
-	rows := m.cache.Layout(b.Lines, o)
-	if !editing && m.itemSel >= 0 {
-		if items := m.getItems(); m.itemSel < len(items) {
-			it := items[m.itemSel]
-			for i, r := range rows {
-				if r.Line == it.Line && r.Img == nil {
-					rows[i] = highlightRow(r, it)
-				}
+}
+
+// blocksOf returns the code blocks and tables of the document. It finds them again after a
+// change of the text.
+func (m *Model) blocksOf() []markdown.Block {
+	d := m.doc
+	if d.plain || d.image {
+		return nil
+	}
+	if !m.blkOK || m.blkDoc != d || m.blkRev != d.buf.Rev {
+		m.blk, m.blkDoc, m.blkRev, m.blkOK = markdown.Blocks(d.buf.Lines), d, d.buf.Rev, true
+	}
+	return m.blk
+}
+
+// unitRows returns the rows of the layout unit that starts at line from (a line, or a
+// whole code block or table). relayout sets the options first.
+func (m *Model) unitRows(from int) []markdown.Row {
+	return m.cache.UnitRows(m.doc.buf.Lines, m.lo, m.blk, from)
+}
+
+// The view of the document starts at an anchor: the first line of a unit (doc.top) and a
+// row in its rows (doc.sub). Only the rows from the anchor to the bottom of the pane are
+// built. A move of the view walks the anchor row by row through the units, so a move costs
+// the rows that it passes, not the size of the document.
+
+// walk moves the anchor n rows down (n > 0) or up (n < 0). It stops at the first row and at
+// the last row of the document.
+func (m *Model) walk(n int) {
+	d := m.doc
+	last := len(d.buf.Lines) - 1
+	for n > 0 {
+		cnt := len(m.unitRows(d.top))
+		if d.sub+n < cnt {
+			d.sub += n
+			return
+		}
+		_, to := markdown.Unit(m.blk, d.top)
+		if to >= last {
+			d.sub = max(0, cnt-1)
+			return
+		}
+		n -= cnt - d.sub
+		d.top, d.sub = to+1, 0
+	}
+	for n < 0 {
+		if d.sub+n >= 0 {
+			d.sub += n
+			return
+		}
+		if d.top == 0 {
+			d.sub = 0
+			return
+		}
+		n += d.sub
+		from, _ := markdown.Unit(m.blk, d.top-1)
+		d.top, d.sub = from, len(m.unitRows(from))
+	}
+}
+
+// fixAnchor makes the anchor the first line of its unit. An edit can change the units: a new
+// fence makes the lines after it a block.
+func (m *Model) fixAnchor() {
+	d := m.doc
+	d.top = max(0, min(d.top, len(d.buf.Lines)-1))
+	from, _ := markdown.Unit(m.blk, d.top)
+	if from == d.top {
+		return
+	}
+	rows := m.unitRows(from)
+	k := 0
+	for k < len(rows) && rows[k].Line < d.top {
+		k++
+	}
+	d.top, d.sub = from, k
+}
+
+// lineAnchor returns the anchor of the first text row of a source line. With col >= 0, it
+// is the row that has that column (the cursor).
+func (m *Model) lineAnchor(line, col int) (top, sub int) {
+	from, _ := markdown.Unit(m.blk, line)
+	rows := m.unitRows(from)
+	k := -1
+	if col >= 0 {
+		k = markdown.CursorRow(rows, line, col)
+	}
+	if k < 0 {
+		for i, r := range rows {
+			if r.Line == line && r.Img == nil {
+				k = i
+				break
 			}
 		}
 	}
-	if !editing && m.vsel.on {
-		rows = m.selectRows(rows)
+	return from, max(0, k)
+}
+
+// before reports whether the anchor (top, sub) comes before the anchor of the view.
+func (m *Model) before(top, sub int) bool {
+	d := m.doc
+	return top < d.top || top == d.top && sub < d.sub
+}
+
+// rowsTo returns the number of rows from the anchor of the view to the anchor (top, sub),
+// or -1 if it is limit rows or more, or above the view.
+func (m *Model) rowsTo(top, sub, limit int) int {
+	d := m.doc
+	if m.before(top, sub) {
+		return -1
 	}
-	return rows
+	n := -d.sub
+	for i := d.top; i < len(d.buf.Lines) && n < limit; {
+		if i == top {
+			if n += sub; n < limit {
+				return n
+			}
+			return -1
+		}
+		_, to := markdown.Unit(m.blk, i)
+		n += len(m.unitRows(i))
+		i = to + 1
+	}
+	return -1
+}
+
+// show moves the view so that the anchor (top, sub) is on the screen. If it is below the
+// screen, it goes to the row at, or it goes to the top with at < 0.
+func (m *Model) show(top, sub, th, at int) {
+	if m.before(top, sub) {
+		m.doc.top, m.doc.sub = top, sub
+		return
+	}
+	if m.rowsTo(top, sub, th) >= 0 {
+		return
+	}
+	m.doc.top, m.doc.sub = top, sub
+	if at > 0 {
+		m.walk(-at)
+	}
+}
+
+// window builds the rows from the anchor down: at most th rows.
+func (m *Model) window(th int) []markdown.Row {
+	d := m.doc
+	var rows []markdown.Row
+	sub := d.sub
+	for i := d.top; i < len(d.buf.Lines) && len(rows) < th; {
+		_, to := markdown.Unit(m.blk, i)
+		if ur := m.unitRows(i); sub < len(ur) {
+			rows = append(rows, ur[sub:]...)
+		}
+		sub = 0
+		i = to + 1
+	}
+	return rows[:min(len(rows), th)]
 }
 
 // highlightRow returns a copy of the row with the cells of the item reversed. It never
@@ -216,7 +317,7 @@ func (m *Model) getItems() []markdown.Item {
 	return m.items
 }
 
-// relayout builds the rows, fixes the scroll position, and starts the image work. It runs
+// relayout builds the rows on the screen, moves the view, and starts the image work. It runs
 // at the end of each Update, so that View only draws.
 func (m *Model) relayout() {
 	if m.width == 0 || m.doc == nil {
@@ -225,45 +326,60 @@ func (m *Model) relayout() {
 	d := m.doc
 	m.findLn = m.buildFindLines()
 	tw, th := m.textW(), m.textH()
-	if key := m.layoutKey(tw, th); !m.laid || key != m.lk {
-		m.rows = m.buildRows(tw, th)
-		m.lk, m.laid = key, true
+	if d.image {
+		m.rows, d.off = m.imageDocRows(tw, th), 0
+		m.placeImages(tw, th)
+		m.pickerSync()
+		return
 	}
+	m.blk = m.blocksOf()
+	m.lo = m.layoutOpts(tw)
+	m.fixAnchor()
+	switch { // the scroll request of the keys and the mouse
+	case d.toEnd:
+		last := len(d.buf.Lines) - 1
+		from, _ := markdown.Unit(m.blk, last)
+		d.top, d.sub = from, max(0, len(m.unitRows(from))-1)
+		m.walk(-(th - 1))
+	case d.off != 0:
+		m.walk(d.off)
+	}
+	d.off, d.toEnd = 0, false
 	if m.reveal.active {
 		m.reveal.active = false
-		if i := m.firstRowOf(m.reveal.line); i >= 0 {
-			switch {
-			case m.reveal.top:
-				d.off = i
-			case i < d.off || i >= d.off+th:
-				d.off = max(0, i-th/3)
-			}
+		top, sub := m.lineAnchor(m.reveal.line, -1)
+		if m.reveal.top {
+			d.top, d.sub = top, sub
+		} else {
+			m.show(top, sub, th, th/3)
 		}
 	}
 	if m.follow && m.mode == modeEdit {
-		if cy := markdown.CursorRow(m.rows, d.buf.Row, d.buf.Col); cy >= 0 {
-			if cy < d.off {
-				d.off = cy
-			}
-			if cy >= d.off+th {
-				d.off = cy - th + 1
-			}
-		}
+		top, sub := m.lineAnchor(d.buf.Row, d.buf.Col)
+		m.show(top, sub, th, th-1)
 	}
 	m.follow = false
-	d.off = max(0, min(d.off, len(m.rows)-th))
-	m.placeImages(tw, th)
-	m.pickerSync()
-}
-
-// firstRowOf returns the index of the first text row of a source line, or -1.
-func (m *Model) firstRowOf(line int) int {
-	for i, r := range m.rows {
-		if r.Line == line && r.Img == nil {
-			return i
+	m.rows = m.window(th)
+	if len(m.rows) < th && (d.top > 0 || d.sub > 0) { // the end of the document is above the bottom
+		m.walk(-(th - len(m.rows)))
+		m.rows = m.window(th)
+	}
+	if m.mode == modeView && m.itemSel >= 0 {
+		if items := m.getItems(); m.itemSel < len(items) {
+			it := items[m.itemSel]
+			for i, r := range m.rows {
+				if r.Line == it.Line && r.Img == nil {
+					m.rows[i] = highlightRow(r, it)
+				}
+			}
 		}
 	}
-	return -1
+	if m.mode == modeView && m.vsel.on {
+		m.rows = m.selectRows(m.rows)
+	}
+	d.buf.Off = m.topLine() // vim H, M, and L need the top line
+	m.placeImages(tw, th)
+	m.pickerSync()
 }
 
 // buildFindLines draws the find box for the width of the pane, or returns nil.

@@ -93,8 +93,7 @@ func (m *Model) placeImages(tw, th int) {
 	if img == nil {
 		return
 	}
-	d := m.doc
-	for i := d.off; i < d.off+th && i < len(m.rows); i++ {
+	for i := 0; i < th && i < len(m.rows); i++ {
 		r := m.rows[i]
 		if r.Img == nil {
 			continue

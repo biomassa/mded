@@ -272,7 +272,7 @@ func TestViewSearch(t *testing.T) {
 	m := testModel(t, p)
 	press(m, "/")
 	typeText(m, "needle")
-	if m.doc.off == 0 {
+	if m.topLine() == 0 {
 		t.Error("the incremental search did not scroll")
 	}
 	if b := m.doc.buf; b.Row != 60 || len(b.Search.Matches) != 2 {
@@ -282,7 +282,7 @@ func TestViewSearch(t *testing.T) {
 		t.Errorf("status line %q", ansi.Strip(m.statusLine()))
 	}
 	press(m, "esc")
-	if m.doc.off != 0 || m.doc.buf.Search.Highlight || m.search != nil {
+	if m.topLine() != 0 || m.doc.buf.Search.Highlight || m.search != nil {
 		t.Error("esc did not restore")
 	}
 	press(m, "/")
@@ -492,12 +492,12 @@ func TestLinkFollowAndBack(t *testing.T) {
 	if m.doc.path != b {
 		t.Fatalf("doc is %q", m.doc.path)
 	}
-	if i := m.firstRowOf(41); i < m.doc.off || i >= m.doc.off+m.textH() {
-		t.Errorf("the heading row %d is not in view (off %d)", i, m.doc.off)
+	if !onScreen(m, 41) {
+		t.Errorf("the heading line 41 is not in view (top line %d)", m.topLine())
 	}
 	press(m, "backspace")
-	if m.doc.path != a || m.doc.off != 0 {
-		t.Fatalf("back: %q off %d", m.doc.path, m.doc.off)
+	if m.doc.path != a || m.topLine() != 0 {
+		t.Fatalf("back: %q top line %d", m.doc.path, m.topLine())
 	}
 	press(m, "tab", "tab", "enter")
 	if opened != "https://example.com" || m.msg != "opened https://example.com" {
@@ -978,4 +978,14 @@ func TestVimMouseDrag(t *testing.T) {
 	if fv.visualOn {
 		t.Error("a click must leave visual mode")
 	}
+}
+
+// onScreen reports whether a text row of a source line is on the screen.
+func onScreen(m *Model, line int) bool {
+	for _, r := range m.rows {
+		if r.Line == line && r.Img == nil {
+			return true
+		}
+	}
+	return false
 }

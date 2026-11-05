@@ -12,15 +12,19 @@ import (
 	"github.com/biomassa/mded/internal/markdown"
 )
 
-// selPos is a point of the screen text: the index of a row in Model.rows, and the index of a
-// cell in that row. A cell index less than 0 is left of the first cell. An index of
-// len(Cells) or more is right of the last cell.
-type selPos struct{ row, col int }
+// selPos is a point of the selection in the source: a line and a rune index. The view
+// changes while the mouse drags (it scrolls), so the selection keeps source positions, not
+// screen rows.
+type selPos struct{ line, col int }
 
-// before reports whether p is before q in the reading order.
+// before reports whether p is before q in the text.
 func (p selPos) before(q selPos) bool {
-	return p.row < q.row || p.row == q.row && p.col <= q.col
+	return p.line < q.line || p.line == q.line && p.col <= q.col
 }
+
+// selPoint is a point under the mouse in two forms: as the start of a selection (the first
+// rune that it has) and as the end (the index after the last rune that it has).
+type selPoint struct{ s, e selPos }
 
 // viewSel is the mouse selection of view mode.
 type viewSel struct {
@@ -28,7 +32,16 @@ type viewSel struct {
 	on     bool // the selection shows: the pointer left the first cell
 	dbl    bool // the press completed a double-click
 	px, py int  // the screen cell of the press
-	a, h   selPos
+	a, h   selPoint
+}
+
+// span returns the selection in the source: from lo to hi, hi not included.
+func (s viewSel) span() (lo, hi selPos) {
+	lo, hi = s.a.s, s.h.e
+	if s.h.s.before(s.a.s) && s.h.s != s.a.s {
+		lo, hi = s.h.s, s.a.e
+	}
+	return lo, hi
 }
 
 // cellAt returns the index of the cell of row r under the screen column x: -1 left of the
@@ -48,25 +61,22 @@ func (m *Model) cellAt(r markdown.Row, x int) int {
 	return len(r.Cells)
 }
 
-// clampOff keeps a scroll offset inside the document.
-func (m *Model) clampOff(off int) int {
-	return max(0, min(off, len(m.rows)-m.textH()))
-}
-
-// selPosAt returns the point of the text under a screen cell. A cell above the text gives
-// the first row on the screen, and a cell below it the last row on the screen. Below the
-// last row of the document, it is the end of the last row. ok is false if there are no rows.
-func (m *Model) selPosAt(x, y int) (selPos, bool) {
+// pointAt returns the source point under a screen cell. A cell above the text gives the
+// first row on the screen, and a cell below it the last row on the screen. ok is false if
+// there are no rows.
+func (m *Model) pointAt(x, y int) (selPoint, bool) {
 	if len(m.rows) == 0 {
-		return selPos{}, false
+		return selPoint{}, false
 	}
 	top := m.docRect().y + 1 + m.textTop()
-	i := m.doc.off + y - top
-	i = max(m.doc.off, min(i, m.doc.off+m.textH()-1))
-	if i >= len(m.rows) {
-		return selPos{len(m.rows) - 1, 1 << 30}, true
+	i := max(0, min(y-top, min(m.textH(), len(m.rows))-1))
+	col := m.cellAt(m.rows[i], x)
+	if y-top >= len(m.rows) { // below the last row: the end of it
+		col = 1 << 30
 	}
-	return selPos{i, m.cellAt(m.rows[i], x)}, true
+	sl, sc := m.srcPos(i, col, false)
+	el, ec := m.srcPos(i, col, true)
+	return selPoint{selPos{sl, sc}, selPos{el, ec}}, true
 }
 
 // viewPress starts a selection in view mode. The click action waits for the release.
@@ -74,7 +84,7 @@ func (m *Model) viewPress(x, y int, dbl bool) {
 	if m.doc.image || m.rowAt(y) < 0 {
 		return
 	}
-	p, ok := m.selPosAt(x, y)
+	p, ok := m.pointAt(x, y)
 	if !ok {
 		return
 	}
@@ -89,13 +99,15 @@ func (m *Model) viewDrag(x, y int) {
 		s.on = true
 	}
 	top := m.docRect().y + 1 + m.textTop()
-	switch {
+	switch { // the pane scrolls one row, and the point is on the new screen
 	case y < top:
-		m.doc.off = m.clampOff(m.doc.off - 1)
+		m.doc.off--
+		m.relayout()
 	case y >= top+m.textH():
-		m.doc.off = m.clampOff(m.doc.off + 1)
+		m.doc.off++
+		m.relayout()
 	}
-	if p, ok := m.selPosAt(x, y); ok {
+	if p, ok := m.pointAt(x, y); ok {
 		s.h = p
 	}
 }
@@ -135,8 +147,8 @@ func (m *Model) lastRowOfLine(i int) bool {
 // a rule, an image, an empty line) maps to its whole source line. A cell without a source
 // rune (a table border) maps to the nearest cell that has one, toward the inside of the
 // selection.
-func (m *Model) srcPos(p selPos, end bool) (line, col int) {
-	r := m.rows[p.row]
+func (m *Model) srcPos(row, cell int, end bool) (line, col int) {
+	r := m.rows[row]
 	n := len(m.doc.buf.Lines[r.Line])
 	whole := func() (int, int) {
 		if end {
@@ -148,10 +160,10 @@ func (m *Model) srcPos(p selPos, end bool) (line, col int) {
 		return whole()
 	}
 	last := len(r.Cells) - 1
-	c := max(0, p.col)
+	c := max(0, cell)
 	past := c > last
 	switch {
-	case past && end && (r.Fill > 0 || m.lastRowOfLine(p.row)): // the padding of a bar, or the end of the line
+	case past && end && (r.Fill > 0 || m.lastRowOfLine(row)): // the padding of a bar, or the end of the line
 		return r.Line, n
 	case past:
 		c = last
@@ -179,22 +191,15 @@ func (m *Model) srcPos(p selPos, end bool) (line, col int) {
 	return r.Line, max(0, min(src, n))
 }
 
-// selSource returns the markdown source behind the selected cells.
+// selSource returns the markdown source of the selection.
 func (m *Model) selSource() string {
-	s := m.vsel
-	if len(m.rows) == 0 || s.a.row >= len(m.rows) || s.h.row >= len(m.rows) {
+	lo, hi := m.vsel.span()
+	lines := m.doc.buf.Lines
+	if lo.line < 0 || hi.line >= len(lines) || !lo.before(hi) {
 		return ""
 	}
-	a, h := s.a, s.h
-	if !a.before(h) {
-		a, h = h, a
-	}
-	l1, c1 := m.srcPos(a, false)
-	l2, c2 := m.srcPos(h, true)
-	lines := m.doc.buf.Lines
-	if l2 < l1 {
-		l1, c1, l2, c2 = l2, c2, l1, c1
-	}
+	l1, c1 := lo.line, min(lo.col, len(lines[lo.line]))
+	l2, c2 := hi.line, min(hi.col, len(lines[hi.line]))
 	if l1 == l2 {
 		if c2 <= c1 {
 			return ""
@@ -210,45 +215,55 @@ func (m *Model) selSource() string {
 }
 
 // selectRows returns the rows with the selection drawn. It copies the cells that it
-// changes, because the markdown cache owns them. A row without cells shows the selection
-// in its full width. An image row and an empty row show none.
+// changes, because the markdown cache owns them. A cell is selected if its source rune is in
+// the selection. A cell without a source rune (a table border) is selected if it is between
+// selected cells, or if its whole line is in the selection. A row without cells shows the
+// selection in its full width if its line is in the selection. An image row and an empty row
+// show none.
 func (m *Model) selectRows(rows []markdown.Row) []markdown.Row {
-	a, h := m.vsel.a, m.vsel.h
-	if !a.before(h) {
-		a, h = h, a
+	lo, hi := m.vsel.span()
+	in := func(line, col int) bool {
+		p := selPos{line, col}
+		return lo.before(p) && !(hi.before(p))
 	}
 	tw := m.textW()
-	for i := a.row; i <= h.row && i < len(rows); i++ {
-		r := rows[i]
-		switch {
-		case r.Img != nil:
-		case len(r.Cells) == 0:
+	for i, r := range rows {
+		if r.Img != nil || r.Line < lo.line || r.Line > hi.line {
+			continue
+		}
+		if len(r.Cells) == 0 {
 			if plain := strings.TrimRight(ansi.Strip(r.Pre), " "); plain != "" {
 				// The margin stays plain. The rest has the selection style, to the text width.
 				text := ansi.Truncate(strings.TrimPrefix(plain, " "), tw, "")
 				r.Pre = " " + selectionStyle(lipgloss.NewStyle()).Render(text+strings.Repeat(" ", max(0, tw-ansi.StringWidth(text))))
 				rows[i] = r
 			}
-		default:
-			lo, hi := 0, len(r.Cells)-1
-			if i == a.row {
-				lo = max(lo, a.col)
-			}
-			if i == h.row {
-				hi = min(hi, h.col)
-			}
-			if lo > hi {
-				continue
-			}
-			cells := make([]markdown.Cell, len(r.Cells))
-			copy(cells, r.Cells)
-			for k := lo; k <= hi; k++ {
-				sel := selectionStyle(*cells[k].St)
-				cells[k].St = &sel
-			}
-			r.Cells, r.Pre = cells, ""
-			rows[i] = r
+			continue
 		}
+		whole := r.Line > lo.line && r.Line < hi.line
+		first, last := -1, -1
+		for k, c := range r.Cells {
+			if c.Src >= 0 && (whole || in(r.Line, c.Src)) {
+				if first < 0 {
+					first = k
+				}
+				last = k
+			}
+		}
+		if first < 0 && !whole {
+			continue
+		}
+		if whole {
+			first, last = 0, len(r.Cells)-1
+		}
+		cells := make([]markdown.Cell, len(r.Cells))
+		copy(cells, r.Cells)
+		for k := first; k <= last; k++ {
+			sel := selectionStyle(*cells[k].St)
+			cells[k].St = &sel
+		}
+		r.Cells, r.Pre = cells, ""
+		rows[i] = r
 	}
 	return rows
 }

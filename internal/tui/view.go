@@ -79,7 +79,7 @@ func (m *Model) docLines(iw, ph int) []string {
 	th := ph - len(out)
 	tw := iw - 2
 	fill := lipgloss.NewStyle()
-	for i := d.off; i < d.off+th && i < len(m.rows); i++ {
+	for i := 0; i < th && i < len(m.rows); i++ {
 		r := m.rows[i]
 		var s string
 		switch {
@@ -109,10 +109,9 @@ func (m *Model) position() string {
 		return strconv.Itoa(b.Row+1) + ":" + strconv.Itoa(b.Col+1) + "  " + strconv.Itoa(pct) + "%"
 	}
 	pct, line := 100, 1
-	if n := len(m.rows); n > 0 {
-		top := min(d.off, n-1)
-		line = m.rows[top].Line + 1
-		pct = min(n, d.off+m.textH()) * 100 / n
+	if n := len(d.buf.Lines); n > 0 && len(m.rows) > 0 {
+		line = m.topLine() + 1
+		pct = min(100, (m.bottomLine()+1)*100/n)
 	}
 	return strconv.Itoa(line) + ":1  " + strconv.Itoa(pct) + "%"
 }
@@ -362,7 +361,7 @@ func (m *Model) docCursor() *tea.Cursor {
 	b := d.buf
 	cy := markdown.CursorRow(m.rows, b.Row, b.Col)
 	th := m.textH()
-	if cy < 0 || cy < d.off || cy >= d.off+th || cy >= len(m.rows) {
+	if cy < 0 || cy >= th || cy >= len(m.rows) {
 		return nil
 	}
 	r := m.rows[cy]
@@ -377,6 +376,6 @@ func (m *Model) docCursor() *tea.Cursor {
 	}
 	dr := m.docRect()
 	x := dr.x + 2 + r.Indent() + cx // the pane border, the row margin, the indent, and the cells before the cursor
-	y := 1 + m.textTop() + cy - d.off
+	y := 1 + m.textTop() + cy
 	return newCursor(min(x, dr.x+dr.w-2), y, m.docCursorShape())
 }
