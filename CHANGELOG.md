@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-05
+
 ### Added
 
 - The sidebar sorts by name, time, size, or type (extension). `s` changes the sort, and `S` reverses it. The title shows the sort, and mded saves it in the config file.
@@ -105,7 +107,8 @@ The release binaries of 0.1.3 already have this change. `go install` of 0.1.3 do
 - Color themes from godoist, with a theme picker (`T`). Each heading level has its own color in all themes.
 - A config file: `~/.config/mded/config.toml`.
 
-[Unreleased]: https://github.com/biomassa/mded/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/biomassa/mded/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/biomassa/mded/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/biomassa/mded/compare/v0.1.4...v0.2.0
 [0.1.4]: https://github.com/biomassa/mded/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/biomassa/mded/compare/v0.1.2...v0.1.3
