@@ -14,7 +14,7 @@ import (
 
 // The size limits of a file. They are variables, so that tests can make them small.
 var (
-	maxOpenSize int64 = 500 << 20 // a larger file does not open
+	maxOpenSize int64 = 100 << 20 // a larger file does not open
 	maxEditSize int64 = 50 << 20  // a larger file opens in view mode only
 )
 
