@@ -149,7 +149,8 @@ mded keeps the file mode, the line endings, and the last line ending of the file
 | `g` / `home`, `G` / `end` | Go to the top or the bottom. |
 | `/` | Search. |
 | `n`, `N` | Go to the next or the previous match. |
-| `tab`, `shift+tab` | Select the next or the previous checkbox or link. |
+| `]`, `[` | Select the next or the previous checkbox or link. |
+| `tab`, `shift+tab` | Move the focus to the sidebar. If the sidebar is hidden, show it. |
 | `space` | Change the selected checkbox. |
 | `enter` | Follow the selected link. |
 | `enter` | With no selected item and with the search highlights on: edit at the current match. |

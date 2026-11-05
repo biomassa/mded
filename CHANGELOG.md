@@ -7,6 +7,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+
+- In view mode, `tab` and `shift+tab` move the focus to the sidebar, and show it if it is hidden. `]` and `[` now select the next and the previous checkbox or link. Thus `tab` switches between the sidebar and the document when you do not edit.
+
 ## [0.3.0] - 2026-11-05
 
 ### Added

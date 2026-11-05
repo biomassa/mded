@@ -18,7 +18,7 @@ import (
 )
 
 // viewHints is the hint text of view mode.
-const viewHints = "e edit · / search · tab links · T theme · ctrl+e sidebar · ? help · q quit"
+const viewHints = "e edit · / search · ] links · T theme · tab sidebar · ? help · q quit"
 
 // emptyHint is the text of the pane when no file is open.
 const emptyHint = "no file open · pick one in the sidebar"

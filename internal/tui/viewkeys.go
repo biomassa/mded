@@ -21,6 +21,8 @@ func (m *Model) viewKey(msg tea.KeyPressMsg) {
 			m.openThemePicker()
 		case "backspace", "ctrl+o":
 			m.back()
+		case "tab", "shift+tab":
+			m.focusPane(focusTree)
 		}
 		return
 	}
@@ -51,10 +53,12 @@ func (m *Model) viewKey(msg tea.KeyPressMsg) {
 		m.startSearch()
 	case "n", "N":
 		m.searchNext(k == "N")
-	case "tab":
+	case "]":
 		m.moveItem(1)
-	case "shift+tab":
+	case "[":
 		m.moveItem(-1)
+	case "tab", "shift+tab": // the other pane: the sidebar shows if it is hidden
+		m.focusPane(focusTree)
 	case "enter":
 		// A selected item (tab) comes first. Else, while the search highlights are on,
 		// enter edits the document at the current match.

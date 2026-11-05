@@ -148,7 +148,7 @@ func TestOpenSaveRoundTrip(t *testing.T) {
 	if m.doc.buf.Dirty() || !m.doc.crlf || m.doc.finalNL {
 		t.Fatalf("after open: dirty=%v crlf=%v finalNL=%v", m.doc.buf.Dirty(), m.doc.crlf, m.doc.finalNL)
 	}
-	press(m, "tab", "space") // select the first checkbox, toggle it
+	press(m, "]", "space") // select the first checkbox, toggle it
 	if !m.doc.buf.Dirty() {
 		t.Fatal("the toggle did not modify the document")
 	}
@@ -215,7 +215,7 @@ func TestBinaryFile(t *testing.T) {
 func TestUnsavedDialog(t *testing.T) {
 	p := writeTemp(t, "a.md", "- [ ] one\n", 0o644)
 	m := testModel(t, p)
-	press(m, "tab", "space", "q")
+	press(m, "]", "space", "q")
 	if m.dlg == nil {
 		t.Fatal("no dialog")
 	}
@@ -234,7 +234,7 @@ func TestUnsavedDialog(t *testing.T) {
 		t.Errorf("discard wrote the file: %q", got)
 	}
 	m = testModel(t, p)
-	press(m, "tab", "space", "ctrl+q", "s")
+	press(m, "]", "space", "ctrl+q", "s")
 	if !m.quitting {
 		t.Fatal("s did not quit")
 	}
@@ -247,7 +247,7 @@ func TestOpenAnotherFileAsks(t *testing.T) {
 	a := writeTemp(t, "a.md", "- [ ] one\n", 0o644)
 	b := writeTemp(t, "b.md", "other\n", 0o644)
 	m := testModel(t, a)
-	press(m, "tab", "space")
+	press(m, "]", "space")
 	m.openFromTree(b)
 	if m.dlg == nil || m.doc.path != a {
 		t.Fatal("no dialog before the switch")
@@ -366,20 +366,20 @@ func TestSearchShowsSourceOnlyForMatches(t *testing.T) {
 func TestItemsTabAndToggle(t *testing.T) {
 	p := writeTemp(t, "a.md", "- [ ] one\n\n[link](other.md)\n\n- [x] two\n", 0o644)
 	m := testModel(t, p)
-	press(m, "tab")
+	press(m, "]")
 	it, ok := m.selectedItem()
 	if !ok || it.Kind != 0 || it.Line != 0 {
 		t.Fatalf("first tab: %+v %v", it, ok)
 	}
-	press(m, "tab")
+	press(m, "]")
 	if it, _ = m.selectedItem(); it.Line != 2 {
 		t.Errorf("second tab: %+v", it)
 	}
-	press(m, "tab", "tab")
+	press(m, "]", "]")
 	if it, _ = m.selectedItem(); it.Line != 0 {
 		t.Errorf("wrap: %+v", it)
 	}
-	press(m, "shift+tab")
+	press(m, "[")
 	if it, _ = m.selectedItem(); it.Line != 4 {
 		t.Errorf("shift+tab: %+v", it)
 	}
@@ -388,7 +388,7 @@ func TestItemsTabAndToggle(t *testing.T) {
 		t.Errorf("toggle: %q", got)
 	}
 	// The highlight must not leak into the cache: after esc the first row has no reverse.
-	press(m, "tab", "esc")
+	press(m, "]", "esc")
 	if m.itemSel != -1 {
 		t.Error("esc kept the selection")
 	}
@@ -488,7 +488,7 @@ func TestLinkFollowAndBack(t *testing.T) {
 	var opened string
 	m := testModel(t, a)
 	m.opts.OpenURL = func(u string) error { opened = u; return nil }
-	press(m, "tab", "enter")
+	press(m, "]", "enter")
 	if m.doc.path != b {
 		t.Fatalf("doc is %q", m.doc.path)
 	}
@@ -499,11 +499,11 @@ func TestLinkFollowAndBack(t *testing.T) {
 	if m.doc.path != a || m.topLine() != 0 {
 		t.Fatalf("back: %q top line %d", m.doc.path, m.topLine())
 	}
-	press(m, "tab", "tab", "enter")
+	press(m, "]", "]", "enter")
 	if opened != "https://example.com" || m.msg != "opened https://example.com" {
 		t.Errorf("opened %q, message %q", opened, m.msg)
 	}
-	press(m, "tab", "enter") // #top in the same document
+	press(m, "]", "enter") // #top in the same document
 	if m.doc.path != a || m.msg == "no heading: #top" {
 		t.Errorf("anchor: %q", m.msg)
 	}
@@ -667,7 +667,7 @@ func TestSidebarQuitAndHelp(t *testing.T) {
 	}
 	// With unsaved changes, q asks first.
 	m = testModel(t, writeTemp(t, "b.md", "- [ ] one\n", 0o644))
-	press(m, "tab", "space", "ctrl+e", "q")
+	press(m, "]", "space", "ctrl+e", "q")
 	if m.dlg == nil || m.quitting {
 		t.Fatal("q must open the unsaved dialog")
 	}
@@ -694,9 +694,9 @@ func TestSidebarTab(t *testing.T) {
 	if m.focus != focusDoc {
 		t.Fatal("shift+tab did not focus the document")
 	}
-	press(m, "tab") // in the document, tab keeps its meaning
-	if m.focus != focusDoc {
-		t.Fatal("tab left the document")
+	press(m, "tab") // in view mode, tab goes back to the sidebar
+	if m.focus != focusTree {
+		t.Fatal("tab in the document did not focus the sidebar")
 	}
 }
 
@@ -722,7 +722,7 @@ func TestSidebarHints(t *testing.T) {
 	if got := m.tree.Hints(); got != "↑↓ move · space open · / filter · s sort · tab document · ? help" {
 		t.Fatal(got)
 	}
-	if !strings.Contains(viewHints, "T theme · ctrl+e sidebar · ? help · q quit") {
+	if viewHints != "e edit · / search · ] links · T theme · tab sidebar · ? help · q quit" {
 		t.Fatal(viewHints)
 	}
 }
@@ -988,4 +988,29 @@ func onScreen(m *Model, line int) bool {
 		}
 	}
 	return false
+}
+
+// In view mode, tab and shift+tab move the focus to the sidebar, and show it if it is
+// hidden. ] and [ select the checkboxes and the links.
+func TestViewTabFocusesSidebar(t *testing.T) {
+	m := testModel(t, writeTemp(t, "a.md", "- [ ] one\n", 0o644))
+	if m.showTree {
+		t.Fatal("the sidebar must start hidden with a file")
+	}
+	press(m, "tab")
+	if !m.showTree || m.focus != focusTree {
+		t.Fatalf("tab: show %v focus %v", m.showTree, m.focus)
+	}
+	press(m, "tab") // in the sidebar, tab goes back to the document
+	press(m, "shift+tab")
+	if m.focus != focusTree {
+		t.Error("shift+tab did not focus the sidebar")
+	}
+	press(m, "tab", "]")
+	if _, ok := m.selectedItem(); !ok || m.focus != focusDoc {
+		t.Error("] did not select the checkbox")
+	}
+	if !strings.Contains(screenText(m), "] links") || !strings.Contains(screenText(m), "tab sidebar") {
+		t.Errorf("hints:\n%s", screenText(m))
+	}
 }
