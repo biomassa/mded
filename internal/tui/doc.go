@@ -12,6 +12,15 @@ import (
 	"github.com/biomassa/mded/internal/buffer"
 )
 
+// The size limits of a file. They are variables, so that tests can make them small.
+var (
+	maxOpenSize int64 = 500 << 20 // a larger file does not open
+	maxEditSize int64 = 50 << 20  // a larger file opens in view mode only
+)
+
+// sizeText is a size limit as text, for example "500 MB".
+func sizeText(n int64) string { return fmt.Sprintf("%d MB", n>>20) }
+
 // binaryProbe is the number of bytes that the binary check reads. A NUL byte in them
 // makes the file a binary file.
 const binaryProbe = 8000
@@ -26,6 +35,7 @@ type doc struct {
 	crlf    bool           // the file had CRLF line ends
 	finalNL bool           // the file ended with a line end
 	exists  bool           // the file exists on disk
+	big     bool           // the file is larger than maxEditSize: view mode only
 	// editRow and editCol are the cursor of the last edit session. View mode moves the
 	// buffer cursor for the search, so the edit position needs its own place.
 	editRow, editCol int
@@ -69,8 +79,11 @@ func loadDoc(path string) (*doc, error) {
 		return nil, errors.New(errText(err))
 	case st.IsDir():
 		return nil, fmt.Errorf("%s is a directory", filepath.Base(path))
+	case st.Size() > maxOpenSize:
+		return nil, fmt.Errorf("%s is over %s: too large to open", filepath.Base(path), sizeText(maxOpenSize))
 	}
 	d.exists = true
+	d.big = st.Size() > maxEditSize
 	if isImage(path) { // images hold NUL bytes, so this check comes first
 		d.image, d.buf = true, buffer.New("")
 		return d, nil
@@ -93,6 +106,36 @@ func loadDoc(path string) (*doc, error) {
 	}
 	d.buf = buffer.New(text)
 	return d, nil
+}
+
+// checkFile finds the errors that loadDoc would report, but reads only the start of the
+// file. The start of the program uses it, so that a bad file stops the program at once and
+// the full read can run in the background.
+func checkFile(path string) error {
+	st, err := os.Stat(path)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return nil // a new file
+	case err != nil:
+		return errors.New(errText(err))
+	case st.IsDir():
+		return fmt.Errorf("%s is a directory", filepath.Base(path))
+	case st.Size() > maxOpenSize:
+		return fmt.Errorf("%s is over %s: too large to open", filepath.Base(path), sizeText(maxOpenSize))
+	case isImage(path):
+		return nil
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return errors.New(errText(err))
+	}
+	defer f.Close()
+	head := make([]byte, binaryProbe)
+	n, _ := f.Read(head)
+	if bytes.IndexByte(head[:n], 0) >= 0 {
+		return fmt.Errorf("binary file: %s", filepath.Base(path))
+	}
+	return nil
 }
 
 // errText makes a short text of a file system error.

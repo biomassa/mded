@@ -77,6 +77,7 @@ func testModelSize(t *testing.T, path string, w, h int) *Model {
 		SaveTheme:        func(string) error { return nil },
 		SaveSidebarWidth: func(int) error { return nil },
 		OpenURL:          func(string) error { return nil },
+		SyncLoad:         true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -778,7 +779,7 @@ func TestImageRows(t *testing.T) {
 	os.WriteFile(md, []byte("before\n\n![pic](p.png)\n\nafter ![x](https://e.com/x.png)\n"), 0o644)
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	mgr := kitty.NewManager(8, 16)
-	m, err := New(Options{Config: config.Defaults(), Path: md, Images: mgr})
+	m, err := New(Options{Config: config.Defaults(), Path: md, Images: mgr, SyncLoad: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -825,7 +826,7 @@ func TestImageViewer(t *testing.T) {
 	f.Close()
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	mgr := kitty.NewManager(8, 16)
-	m, err := New(Options{Config: config.Defaults(), Path: p, Images: mgr})
+	m, err := New(Options{Config: config.Defaults(), Path: p, Images: mgr, SyncLoad: true})
 	if err != nil {
 		t.Fatal(err)
 	}

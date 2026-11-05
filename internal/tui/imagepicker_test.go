@@ -91,7 +91,7 @@ func TestPickerHidden(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	cfg := config.Defaults()
 	cfg.ShowHidden = true
-	m, err := New(Options{Config: cfg, Path: md})
+	m, err := New(Options{Config: cfg, Path: md, SyncLoad: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func newVimModel(t *testing.T, path string) *Model {
 	t.Helper()
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	m, err := New(Options{
-		Config: config.Defaults(), Path: path, Vim: true,
+		Config: config.Defaults(), Path: path, Vim: true, SyncLoad: true,
 		NewVim: func(tw int) keymap.Keymap { return vim.New(tw) },
 	})
 	if err != nil {
@@ -274,7 +274,7 @@ func TestPickerPreviewImage(t *testing.T) {
 	png.Encode(f, image.NewRGBA(image.Rect(0, 0, 80, 64)))
 	f.Close()
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	m, err := New(Options{Config: config.Defaults(), Path: md, Images: kitty.NewManager(8, 16)})
+	m, err := New(Options{Config: config.Defaults(), Path: md, Images: kitty.NewManager(8, 16), SyncLoad: true})
 	if err != nil {
 		t.Fatal(err)
 	}

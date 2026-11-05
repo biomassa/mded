@@ -36,6 +36,17 @@ type Options struct {
 	SaveSidebarWidth func(w int) error
 	SaveSidebarSort  func(mode string, desc bool) error
 	OpenURL          func(url string) error
+	// SyncLoad reads files at once, not in the background. Tests use it, because they do
+	// not run the commands that Update returns.
+	SyncLoad bool
+}
+
+// docLoadedMsg is the result of a load in the background. gen is the number of the load:
+// a result of an older load is dropped.
+type docLoadedMsg struct {
+	gen int
+	d   *doc
+	err error
 }
 
 // focusPane is the pane that gets the keys.
@@ -77,11 +88,15 @@ type Model struct {
 	tree  *tree.Tree
 
 	width, height int
-	showTree      bool
-	sidebarW      int
-	focus         focusPane
-	termDark      bool
-	themeGen      int // counts theme changes, for the layout key
+	// loadGen counts the loads. onLoad is what the current load does with the document,
+	// or nil if no load is in progress.
+	loadGen  int
+	onLoad   func(*doc)
+	showTree bool
+	sidebarW int
+	focus    focusPane
+	termDark bool
+	themeGen int // counts theme changes, for the layout key
 
 	doc  *doc
 	hist []*doc // link history: the documents that a back key returns to
@@ -185,11 +200,11 @@ func New(o Options) (*Model, error) {
 		m.showTree, m.focus = true, focusTree
 		return m, nil
 	}
-	d, err := loadDoc(file)
-	if err != nil {
+	if err := checkFile(file); err != nil {
 		return nil, err
 	}
-	m.setDoc(d)
+	m.doc = blankDoc()
+	m.loadThen(file, m.setDoc)
 	return m, nil
 }
 
@@ -203,7 +218,11 @@ func (m *Model) Cleanup() string {
 }
 
 // Init asks the terminal for its background color.
-func (m *Model) Init() tea.Cmd { return tea.RequestBackgroundColor }
+func (m *Model) Init() tea.Cmd {
+	cmds := append(m.cmds, tea.RequestBackgroundColor) // the load of the start file
+	m.cmds = nil
+	return tea.Batch(cmds...)
+}
 
 // cmd queues a command for the end of the Update.
 func (m *Model) cmd(c tea.Cmd) {
@@ -271,6 +290,8 @@ func (m *Model) update(msg tea.Msg) {
 		m.mouseWheel(msg.Mouse())
 	case tea.KeyPressMsg:
 		m.key(msg)
+	case docLoadedMsg:
+		m.loaded(msg)
 	}
 }
 
@@ -322,6 +343,9 @@ func (m *Model) promptOpen() bool {
 func (m *Model) key(msg tea.KeyPressMsg) {
 	k := msg.String()
 	m.vsel = viewSel{} // any key ends the selection of the view, and then does its own action
+	if k == "esc" && m.cancelLoad() {
+		return
+	}
 	if m.dlg != nil {
 		m.dialogKey(k)
 		return
@@ -486,24 +510,58 @@ func (m *Model) treeAction(a tree.Action) {
 
 // openFromTree opens a file of the sidebar. The focus moves to the document if it opens.
 func (m *Model) openFromTree(path string) {
-	if d, ok := m.load(path); ok {
+	m.loadThen(path, func(d *doc) {
 		m.guard(func() {
 			m.setDoc(d)
 			m.focus = focusDoc
 		})
-	}
+	})
 }
 
 // ---- documents ----
 
-// load reads a file and shows the error in the status line.
-func (m *Model) load(path string) (*doc, bool) {
-	d, err := loadDoc(path)
-	if err != nil {
-		m.status(err.Error(), true)
-		return nil, false
+// loadThen reads a file in the background and then gives the document to then. While
+// the file loads, the status line shows "loading NAME…" and the pane keeps the document
+// that it shows. A new load or esc cancels the load. An error goes to the status line.
+func (m *Model) loadThen(path string, then func(*doc)) {
+	m.loadGen++
+	gen := m.loadGen
+	m.onLoad = then
+	m.msg, m.msgErr = "loading "+filepath.Base(path)+"…", false
+	m.msgSeq++ // the message stays until the load ends
+	load := func() tea.Msg {
+		d, err := loadDoc(path)
+		return docLoadedMsg{gen: gen, d: d, err: err}
 	}
-	return d, true
+	if m.opts.SyncLoad {
+		m.loaded(load().(docLoadedMsg))
+		return
+	}
+	m.cmd(load)
+}
+
+// loaded takes the result of a load. A result of a canceled or an older load is dropped.
+func (m *Model) loaded(msg docLoadedMsg) {
+	if msg.gen != m.loadGen || m.onLoad == nil {
+		return
+	}
+	then := m.onLoad
+	m.onLoad, m.msg = nil, ""
+	if msg.err != nil {
+		m.status(msg.err.Error(), true)
+		return
+	}
+	then(msg.d)
+}
+
+// cancelLoad stops the load in progress. It reports whether a load was in progress.
+func (m *Model) cancelLoad() bool {
+	if m.onLoad == nil {
+		return false
+	}
+	m.loadGen++
+	m.onLoad, m.msg = nil, ""
+	return true
 }
 
 // setDoc shows d in view mode.
@@ -642,20 +700,18 @@ func (m *Model) followLink(url string) {
 		m.status("no such file: "+file, true)
 		return
 	}
-	nd, ok := m.load(path)
-	if !ok {
-		return
-	}
-	m.guard(func() {
-		m.pushHistory()
-		m.setDoc(nd)
-		if anchor != "" {
-			if line := markdown.FindHeading(nd.buf.Lines, anchor); line >= 0 {
-				m.reveal = revealReq{line: line, top: true, active: true}
-			} else {
-				m.status("no heading: #"+anchor, true)
+	m.loadThen(path, func(nd *doc) {
+		m.guard(func() {
+			m.pushHistory()
+			m.setDoc(nd)
+			if anchor != "" {
+				if line := markdown.FindHeading(nd.buf.Lines, anchor); line >= 0 {
+					m.reveal = revealReq{line: line, top: true, active: true}
+				} else {
+					m.status("no heading: #"+anchor, true)
+				}
 			}
-		}
+		})
 	})
 }
 
@@ -707,6 +763,10 @@ func (m *Model) enterEdit(at *[2]int) {
 	}
 	if d.image {
 		m.status("image files open in view mode only", true)
+		return
+	}
+	if d.big {
+		m.status(filepath.Base(d.path)+" is over "+sizeText(maxEditSize)+": view mode only", true)
 		return
 	}
 	m.mode = modeEdit
@@ -791,13 +851,11 @@ func (m *Model) editFile(path string) {
 	if path == "" {
 		return
 	}
-	d, ok := m.load(path)
-	if !ok {
-		return
-	}
-	m.guard(func() {
-		m.setDoc(d)
-		m.enterEdit(nil)
+	m.loadThen(path, func(d *doc) {
+		m.guard(func() {
+			m.setDoc(d)
+			m.enterEdit(nil)
+		})
 	})
 }
 

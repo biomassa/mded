@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -24,6 +25,9 @@ func main() { os.Exit(run(os.Args[1:])) }
 
 // run does the work of the command and returns the exit code.
 func run(args []string) int {
+	// A soft limit: near it, the garbage collector works harder, before the system must
+	// stop processes for lack of memory.
+	debug.SetMemoryLimit(2 << 30)
 	var usage bytes.Buffer
 	fs := flag.NewFlagSet("mded", flag.ContinueOnError)
 	fs.SetOutput(&usage)
