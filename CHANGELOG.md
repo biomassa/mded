@@ -26,6 +26,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - A large file does not make mded use all the memory of the computer. Before, a 1 MB file needed more than 1 GB, and a 10 MB file could make the system stop the terminal. Now mded builds only the rows on the screen, a row needs much less memory, and an undo step keeps only the lines that it changed. A 9 MB file opens in less than 0.1 seconds with less than 100 MB.
 - A key in edit mode answers fast also in a large file. Before, one key in a 9 MB file took 5 seconds.
+- In vim mode, `H`, `M`, and `L` go to the top, the middle, and the bottom of the screen. Before, they counted from the first line of the document.
 
 ## [0.2.0] - 2026-10-18
 
