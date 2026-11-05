@@ -239,20 +239,39 @@ mded shows pictures in terminals with the kitty graphics protocol: kitty and Gho
 | Key | Action |
 |---|---|
 | `↑`, `↓` | Move. |
-| `→`, `enter` | Expand a directory, or open a file. On an expanded directory, go to its first entry. |
-| `←` | Collapse a directory, or go to the parent entry. On the top row, show the parent directory. |
+| `pgup`, `pgdown` | Move one screen. |
+| `home`, `end` | Go to the first or the last entry. |
+| `enter`, `space`, double-click | Open or close a directory, or open a file. |
+| `→` | Open a directory. On an open directory, go to its first entry. |
+| `←` | Close a directory, or go to the parent entry. On the top row, show the parent directory. |
+| `tab`, `shift+tab` | Move the focus to the document. |
 | `/` | Filter the names in the full tree. `enter` keeps the filter, and `esc` removes it. |
+| `s` | Change the sort: name, time, size, type (extension). |
+| `S` | Reverse the sort. |
 | `ctrl+n` | Make a new file. |
 | `ctrl+shift+n` | Make a new directory. |
 | `F2` | Rename. |
 | `delete` | Delete. mded asks first. |
 | `ctrl+h` | Show or hide hidden files. |
+| `?` | Show the keys. |
+| `q` | Quit. |
 
 `ctrl+e` and `alt+h` also show a hidden sidebar.
+
+Directories always come first. The title of the sidebar shows the sort, for example `~/notes · time ↓`. Name and type sort up, time and size sort down (the newest and the largest first). mded saves the sort in the config file.
+
+Directories show in the accent color. Markdown files show in the text color, and other files in a muted color.
 
 The sidebar shows all files. Markdown files open formatted. Other text files open as plain text. Picture files show the picture. mded does not open other binary files.
 
 Drag the border between the sidebar and the document to change the width. mded saves the width in the config file.
+
+## Large files
+
+mded reads a file in the background. While it reads, the status line shows `loading NAME…`, and `esc` stops the load. mded builds only the rows on the screen, so a large file opens fast and needs little memory.
+
+- A file larger than 50 MB opens in view mode only.
+- mded does not open a file larger than 100 MB.
 
 ## Themes
 
@@ -273,6 +292,8 @@ The config file is `~/.config/mded/config.toml`. All keys are optional.
 | `show_hidden` | `false` | Show hidden files in the sidebar at the start. |
 | `tab_width` | `4` | The number of spaces for one indent. |
 | `sidebar_width` | `30` | The width of the sidebar, in columns. |
+| `sidebar_sort` | `"name"` | `"name"`, `"time"`, `"size"`, or `"type"`. |
+| `sidebar_sort_desc` | `false` | Sort down. |
 
 ## Mouse
 

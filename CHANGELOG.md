@@ -7,6 +7,26 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- The sidebar sorts by name, time, size, or type (extension). `s` changes the sort, and `S` reverses it. The title shows the sort, and mded saves it in the config file.
+- In the sidebar, `pgup` and `pgdown` move one screen, and `home` and `end` go to the first and the last entry.
+- In the sidebar, `q` quits, `?` shows the keys, and `tab` moves the focus to the document.
+- mded reads a file in the background, with the status `loading NAME…`. `esc` stops the load.
+
+### Changed
+
+- In the sidebar, `enter`, `space`, and a double-click open and close a directory. Before, `enter` on an open directory went to its first entry. `→` still does that.
+- In the sidebar, directories have the accent color, markdown files the text color, and other files a muted color.
+- The view hint shows `ctrl+e sidebar`.
+- A file larger than 50 MB opens in view mode only. mded does not open a file larger than 100 MB.
+- The unsaved mark `[+]` stays after a change that you take back by hand. An undo to the saved text removes it.
+
+### Fixed
+
+- A large file does not make mded use all the memory of the computer. Before, a 1 MB file needed more than 1 GB, and a 10 MB file could make the system stop the terminal. Now mded builds only the rows on the screen, a row needs much less memory, and an undo step keeps only the lines that it changed. A 9 MB file opens in less than 0.1 seconds with less than 100 MB.
+- A key in edit mode answers fast also in a large file. Before, one key in a 9 MB file took 5 seconds.
+
 ## [0.2.0] - 2026-10-18
 
 ### Added
