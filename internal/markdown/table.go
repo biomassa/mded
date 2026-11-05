@@ -136,10 +136,10 @@ func buildTable(lines [][]rune, tw int) []Row {
 		widths[i] = max(1, widths[i])
 	}
 	line := theme.St(theme.Text)
-	bar := func(r rune) Cell { return Cell{r, line, -1} }
+	bar := func(r rune) Cell { return Cell{r, &line, -1} }
 	pad := func(k int) (out []Cell) {
 		for ; k > 0; k-- {
-			out = append(out, Cell{' ', text, -1})
+			out = append(out, Cell{' ', &text, -1})
 		}
 		return
 	}

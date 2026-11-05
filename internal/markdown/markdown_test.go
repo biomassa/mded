@@ -260,7 +260,7 @@ func TestLayoutSourceWrapAndDecorate(t *testing.T) {
 	rows := c.Layout(runes("aaaa bbbb cccc dddd"), LayoutOpts{
 		Width:    10,
 		AsSource: func(int) bool { return true },
-		Decorate: func(line, col int, st lipgloss.Style) lipgloss.Style { n++; return st },
+		Decorate: func(line, col int, st *lipgloss.Style) *lipgloss.Style { n++; return st },
 	})
 	// Width 10 less one cell of indent: a row has at most 9 runes.
 	if len(rows) != 3 || rows[1].Start != 5 || n != 19 {

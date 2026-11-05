@@ -190,8 +190,9 @@ func centerCells(cells []Cell, tw int) []Cell {
 	}
 	pad := max(1, (tw-ansi.StringWidth(sb.String()))/2)
 	out := make([]Cell, 0, pad+len(text))
+	bar := stylePtr(theme.HeadingStyle(1))
 	for range pad {
-		out = append(out, Cell{' ', theme.HeadingStyle(1), text[0].Src})
+		out = append(out, Cell{' ', bar, text[0].Src})
 	}
 	return append(out, text...)
 }
@@ -230,7 +231,10 @@ func RenderRow(r Row, tw, cx int) string {
 	var b strings.Builder
 	for k := 0; k < len(r.Cells); k++ {
 		cl := r.Cells[k]
-		st := cl.St
+		var st lipgloss.Style // a cell without a style shows as plain text
+		if cl.St != nil {
+			st = *cl.St
+		}
 		if k == cx {
 			st = st.Reverse(true)
 		}

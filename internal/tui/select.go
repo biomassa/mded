@@ -243,7 +243,8 @@ func (m *Model) selectRows(rows []markdown.Row) []markdown.Row {
 			cells := make([]markdown.Cell, len(r.Cells))
 			copy(cells, r.Cells)
 			for k := lo; k <= hi; k++ {
-				cells[k].St = selectionStyle(cells[k].St)
+				sel := selectionStyle(*cells[k].St)
+				cells[k].St = &sel
 			}
 			r.Cells, r.Pre = cells, ""
 			rows[i] = r

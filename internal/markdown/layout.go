@@ -17,7 +17,8 @@ type LayoutOpts struct {
 	// shows all its lines as source.
 	AsSource func(line int) bool
 	// Decorate changes the style of a source cell: search highlight and selection. It can be nil.
-	Decorate func(line, col int, st lipgloss.Style) lipgloss.Style
+	// It returns st itself for a cell that does not change, so that the cells share it.
+	Decorate func(line, col int, st *lipgloss.Style) *lipgloss.Style
 	// ImageSize gives the size of an image in cells. If it is nil or not ok, the image
 	// has no rows.
 	ImageSize func(ref ImageRef) (cols, rows int, ok bool)
@@ -35,6 +36,7 @@ func (o LayoutOpts) sourceRows(l []rune, i int, inFence bool) []Row {
 		}
 	}
 	var rows []Row
+	kindSt := map[StyleKind]*lipgloss.Style{}
 	starts := WrapLine(l, BodyWidth(o.Width)) // every source row has the indent
 	for k, s := range starts {
 		end := len(l)
@@ -47,9 +49,14 @@ func (o LayoutOpts) sourceRows(l []rune, i int, inFence bool) []Row {
 			if kinds != nil {
 				kind = kinds[j]
 			}
-			st := KindStyle(kind)
-			if level > 0 && kind == KindHeading { // headings are bars in their level color
-				st = theme.HeadingStyle(level)
+			st := kindSt[kind]
+			if st == nil { // one style of each kind for the line, shared by its cells
+				if level > 0 && kind == KindHeading { // headings are bars in their level color
+					st = stylePtr(theme.HeadingStyle(level))
+				} else {
+					st = stylePtr(KindStyle(kind))
+				}
+				kindSt[kind] = st
 			}
 			if o.Decorate != nil {
 				st = o.Decorate(i, j, st)

@@ -18,10 +18,15 @@ import (
 // it comes from, for a click and for item highlights. A marker that the preview adds
 // (• or ☐) has the position of the source marker.
 type Cell struct {
-	R   rune
-	St  lipgloss.Style
+	R rune
+	// St is shared by all cells of a span: a lipgloss.Style is about 650 bytes, so a copy in
+	// each cell made a large document need gigabytes. Change a style through a new value.
+	St  *lipgloss.Style
 	Src int
 }
+
+// stylePtr returns a pointer to a copy of st, for the cells of one span.
+func stylePtr(st lipgloss.Style) *lipgloss.Style { return &st }
 
 // Row is one screen row. A rendered block or a cached row has its text in Pre. Other rows
 // have Cells. An image row has Img and no text: the UI draws it.
@@ -94,8 +99,9 @@ func inlineCells(s string, offset int, base lipgloss.Style, spans *[]span) []Cel
 	rs := []rune(s)
 	var out []Cell
 	part := func(a, b int, st lipgloss.Style) {
+		p := &st // one style for all cells of the part
 		for i := a; i < b; i++ {
-			out = append(out, Cell{rs[i], st, offset + i})
+			out = append(out, Cell{rs[i], p, offset + i})
 		}
 	}
 	// inner renders the text of a span with its own inline markdown, for example code in
@@ -133,12 +139,12 @@ func inlineCells(s string, offset int, base lipgloss.Style, spans *[]span) []Cel
 			// terminal draws two, and the row wraps.
 			st := base.Foreground(theme.C(theme.Link)).Underline(true)
 			mid := strings.Index(tok, "](")
-			out = append(out, Cell{'📷', st, offset + a}, Cell{' ', st, offset + a})
+			out = append(out, Cell{'📷', &st, offset + a}, Cell{' ', &st, offset + a})
 			if alt := tok[2:mid]; alt != "" {
 				part(a+2, a+2+utf8.RuneCountInString(alt), st)
 			} else { // no alt text: show the file name
 				for _, r := range path.Base(tok[mid+2 : len(tok)-1]) {
-					out = append(out, Cell{r, st, offset + a})
+					out = append(out, Cell{r, &st, offset + a})
 				}
 			}
 		case tok[0] == '[':
@@ -178,7 +184,7 @@ func previewLine(src string, withSpans bool) (cells []Cell, level int, spans []s
 	lead := func(indent string) []Cell {
 		var out []Cell
 		for i, r := range indent {
-			out = append(out, Cell{r, text, i})
+			out = append(out, Cell{r, &text, i})
 		}
 		return out
 	}
@@ -186,10 +192,10 @@ func previewLine(src string, withSpans bool) (cells []Cell, level int, spans []s
 	if lv, h := HeadingLevel(src); lv > 0 {
 		st := theme.HeadingStyle(lv)
 		off := runeAt(strings.Index(src, h))
-		return append([]Cell{{' ', st, 0}}, inlineCells(h, off, st, sp)...), lv, spans
+		return append([]Cell{{' ', &st, 0}}, inlineCells(h, off, st, sp)...), lv, spans
 	}
 	if ruleLine.MatchString(src) {
-		return []Cell{{'─', theme.St(theme.Dim), 0}}, -1, nil // -1: a rule to the full width
+		return []Cell{{'─', stylePtr(theme.St(theme.Dim)), 0}}, -1, nil // -1: a rule to the full width
 	}
 	if sm := checkItem.FindStringSubmatchIndex(src); sm != nil {
 		box := '☐'
@@ -199,12 +205,12 @@ func previewLine(src string, withSpans bool) (cells []Cell, level int, spans []s
 		cells = lead(src[sm[2]:sm[3]])
 		if lit := src[sm[4]:sm[5]]; lit[0] >= '0' && lit[0] <= '9' { // a numbered item keeps its number
 			for i, r := range lit {
-				cells = append(cells, Cell{r, marker, runeAt(sm[4]) + i})
+				cells = append(cells, Cell{r, &marker, runeAt(sm[4]) + i})
 			}
-			cells = append(cells, Cell{' ', text, runeAt(sm[5])})
+			cells = append(cells, Cell{' ', &text, runeAt(sm[5])})
 		}
 		mark := runeAt(sm[6])
-		cells = append(cells, Cell{box, marker, mark}, Cell{' ', text, mark})
+		cells = append(cells, Cell{box, &marker, mark}, Cell{' ', &text, mark})
 		if withSpans {
 			spans = append(spans, span{kind: Checkbox, start: mark - 1, end: mark + 2})
 		}
@@ -212,20 +218,20 @@ func previewLine(src string, withSpans bool) (cells []Cell, level int, spans []s
 	}
 	if sm := bulletItem.FindStringSubmatchIndex(src); sm != nil {
 		cells = lead(src[sm[2]:sm[3]])
-		cells = append(cells, Cell{'•', marker, runeAt(sm[3])}, Cell{' ', text, runeAt(sm[3])})
+		cells = append(cells, Cell{'•', &marker, runeAt(sm[3])}, Cell{' ', &text, runeAt(sm[3])})
 		return append(cells, inlineCells(src[sm[4]:sm[5]], runeAt(sm[4]), text, sp)...), 0, spans
 	}
 	if sm := numberItem.FindStringSubmatchIndex(src); sm != nil {
 		cells = lead(src[sm[2]:sm[3]])
 		for i, r := range src[sm[4]:sm[5]] {
-			cells = append(cells, Cell{r, marker, runeAt(sm[4]) + i})
+			cells = append(cells, Cell{r, &marker, runeAt(sm[4]) + i})
 		}
-		cells = append(cells, Cell{' ', text, runeAt(sm[5])})
+		cells = append(cells, Cell{' ', &text, runeAt(sm[5])})
 		return append(cells, inlineCells(src[sm[6]:sm[7]], runeAt(sm[6]), text, sp)...), 0, spans
 	}
 	if sm := quoteLine.FindStringSubmatchIndex(src); sm != nil {
 		q := KindStyle(KindQuote)
-		cells = []Cell{{'│', theme.St(theme.Muted), 0}, {' ', q, 0}}
+		cells = []Cell{{'│', stylePtr(theme.St(theme.Muted)), 0}, {' ', &q, 0}}
 		return append(cells, inlineCells(src[sm[2]:sm[3]], runeAt(sm[2]), q, sp)...), 0, spans
 	}
 	return inlineCells(src, 0, text, sp), 0, spans

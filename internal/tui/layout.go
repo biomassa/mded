@@ -149,13 +149,15 @@ func (m *Model) buildRows(tw, th int) []markdown.Row {
 			}
 			return len(spans[i]) > 0
 		},
-		Decorate: func(line, col int, st lipgloss.Style) lipgloss.Style {
+		Decorate: func(line, col int, st *lipgloss.Style) *lipgloss.Style {
 			if editing && b.InSel(line, col) {
-				return selectionStyle(st)
+				s := selectionStyle(*st)
+				return &s
 			}
 			for _, s := range spans[line] {
 				if col >= s.a && col < s.b {
-					return matchStyle(st, s.cur)
+					ms := matchStyle(*st, s.cur)
+					return &ms
 				}
 			}
 			return st
@@ -189,7 +191,8 @@ func highlightRow(r markdown.Row, it markdown.Item) markdown.Row {
 	hit := false
 	for i, c := range cells {
 		if c.Src >= it.Start && c.Src < it.End {
-			cells[i].St = c.St.Reverse(true)
+			rev := c.St.Reverse(true)
+			cells[i].St = &rev
 			hit = true
 		}
 	}
