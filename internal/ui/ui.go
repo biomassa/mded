@@ -115,3 +115,20 @@ func Pane(title string, lines []string, w int, lineHex, sepHex string, sep bool)
 	sb.WriteString("\n" + sp.Render(strings.Repeat("─", inner+1)) + bottomEnd)
 	return sb.String()
 }
+
+// Legend styles a key hint text such as "e edit · ? help": in each item, the key (the text
+// before the first space) is bold in the accent color, and the rest is muted. The separators
+// are dim.
+func Legend(text string) string {
+	const sep = " · "
+	items := strings.Split(text, sep)
+	for i, item := range items {
+		key, desc, ok := strings.Cut(item, " ")
+		s := theme.St(theme.Accent).Bold(true).Render(key)
+		if ok {
+			s += " " + theme.St(theme.Muted).Render(desc)
+		}
+		items[i] = s
+	}
+	return strings.Join(items, theme.St(theme.Dim).Render(sep))
+}

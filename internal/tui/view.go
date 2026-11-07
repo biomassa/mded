@@ -177,7 +177,7 @@ func (m *Model) statusLine() string {
 		}
 		mid = theme.St(hex).Render(m.msg)
 	default:
-		mid = theme.St(theme.Dim).Render(m.hints())
+		mid = ui.Legend(m.hints())
 	}
 	// The message wins over the position and the path when the line is short.
 	avail := w - lipgloss.Width(left) - lipgloss.Width(right) - 4
