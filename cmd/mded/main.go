@@ -21,7 +21,16 @@ import (
 	"github.com/biomassa/mded/internal/version"
 )
 
-func main() { os.Exit(run(os.Args[1:])) }
+// stopProf stops the profiles of a prof build. It is nil in a normal build.
+var stopProf func()
+
+func main() {
+	code := run(os.Args[1:])
+	if stopProf != nil {
+		stopProf()
+	}
+	os.Exit(code)
+}
 
 // run does the work of the command and returns the exit code.
 func run(args []string) int {
@@ -79,7 +88,7 @@ func run(args []string) int {
 	if fs.NArg() == 1 {
 		opts.Path = fs.Arg(0)
 	}
-	var progOpts []tea.ProgramOption
+	progOpts := []tea.ProgramOption{tea.WithFPS(tui.FPS)}
 	if kitty.Supported(cfg.Images) {
 		w, h := kitty.CellSize()
 		opts.Images = kitty.NewManager(w, h)

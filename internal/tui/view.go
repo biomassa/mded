@@ -26,6 +26,15 @@ const emptyHint = "no file open · pick one in the sidebar"
 // View draws the screen. It only reads the state that Update built.
 func (m *Model) View() tea.View {
 	m.shown.CompareAndSwap(0, time.Now().UnixNano())
+	if m.held {
+		return m.last
+	}
+	m.last, m.built = m.view(), time.Now()
+	return m.last
+}
+
+// view builds the frame.
+func (m *Model) view() tea.View {
 	v := tea.NewView(m.screen())
 	v.MouseMode = tea.MouseModeCellMotion // clicks, wheel, and motion while a button is down
 	v.AltScreen = true
@@ -43,7 +52,7 @@ func (m *Model) screen() string {
 		return ""
 	}
 	dr := m.docRect()
-	var panes []string
+	var panes [][]string
 	if m.showTree {
 		tr := m.treeRect()
 		border := theme.Border
@@ -52,7 +61,7 @@ func (m *Model) screen() string {
 			border = theme.Accent
 			title = theme.St(theme.Fg(theme.Accent)).Bold(true).Render(m.tree.Title())
 		}
-		panes = append(panes, ui.Pane(title, m.tree.View(tr.w-2, tr.h-2, m.focus == focusTree), tr.w, border, theme.Border, true))
+		panes = append(panes, ui.PaneLines(title, ui.PadLines(m.tree.View(tr.w-2, tr.h-2, m.focus == focusTree), tr.w-2, tr.h-2), tr.w, border, theme.Border, true))
 	}
 	border := theme.Border
 	title := theme.St(theme.Muted).Bold(true).Render(m.doc.title())
@@ -60,8 +69,16 @@ func (m *Model) screen() string {
 		border = theme.Accent
 		title = theme.St(theme.Fg(theme.Accent)).Bold(true).Render(m.doc.title())
 	}
-	panes = append(panes, ui.Pane(title, m.docLines(dr.w-2, dr.h-2), dr.w, border, theme.Border, false))
-	screen := lipgloss.JoinHorizontal(lipgloss.Top, panes...) + "\n" + m.statusLine()
+	panes = append(panes, ui.PaneLines(title, m.docLines(dr.w-2, dr.h-2), dr.w, border, theme.Border, false))
+	// The lines of the panes have their exact widths, so a join does not measure them again.
+	var sb strings.Builder
+	for i := range panes[0] {
+		for _, p := range panes {
+			sb.WriteString(p[i])
+		}
+		sb.WriteByte('\n')
+	}
+	screen := sb.String() + m.statusLine()
 	return m.overlays(screen)
 }
 
@@ -78,7 +95,7 @@ func (m *Model) docLines(iw, ph int) []string {
 	}
 	th := ph - len(out)
 	tw := iw - 2
-	fill := lipgloss.NewStyle()
+	m.pads.frame()
 	for i := 0; i < th && i < len(m.rows); i++ {
 		r := m.rows[i]
 		var s string
@@ -90,9 +107,12 @@ func (m *Model) docLines(iw, ph int) []string {
 		default:
 			s = markdown.RenderRow(r, tw, -1) // the terminal draws the cursor: see cursor
 		}
-		out = append(out, ui.Pad(s, iw, fill))
+		out = append(out, m.pads.pad(s, iw))
 	}
-	return ui.PadLines(out, iw, ph)
+	for len(out) < ph { // the lines under the text; the lines above are already iw cells wide
+		out = append(out, strings.Repeat(" ", iw))
+	}
+	return out[:ph]
 }
 
 // ---- status line ----
@@ -177,7 +197,11 @@ func (m *Model) statusLine() string {
 		}
 		mid = theme.St(hex).Render(m.msg)
 	default:
-		mid = ui.Legend(m.hints())
+		h := m.hints()
+		if key := h + "\x00" + theme.Accent + theme.Muted + theme.Dim; key != m.legendKey {
+			m.legendKey, m.legendOut = key, ui.Legend(h)
+		}
+		mid = m.legendOut
 	}
 	// The message wins over the position and the path when the line is short.
 	avail := w - lipgloss.Width(left) - lipgloss.Width(right) - 4
@@ -231,6 +255,9 @@ func (m *Model) hints() string {
 
 // overlays draws the help and the theme picker over the screen.
 func (m *Model) overlays(screen string) string {
+	if m.help == nil && m.themes == nil && (m.img == nil || m.img.altOn) {
+		return screen // no overlay: the layer of the screen is not necessary
+	}
 	layers := []*lipgloss.Layer{lipgloss.NewLayer(screen)}
 	if m.help != nil {
 		r := m.helpRect()

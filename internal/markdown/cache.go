@@ -228,24 +228,35 @@ func RenderRow(r Row, tw, cx int) string {
 	default:
 		lead += " "
 	}
+	// The cells of a run that share a style (the same pointer) and are not the cursor go
+	// to one Render call. A row of plain text is one call, not one call for each cell.
 	var b strings.Builder
-	for k := 0; k < len(r.Cells); k++ {
-		cl := r.Cells[k]
-		var st lipgloss.Style // a cell without a style shows as plain text
-		if cl.St != nil {
-			st = *cl.St
-		}
-		if k == cx {
-			st = st.Reverse(true)
-		}
-		// A variation selector or a combining mark goes into the same styled text as the
-		// rune before it. An escape sequence between them breaks the glyph in the terminal.
-		text := []rune{cl.R}
-		for k+1 < len(r.Cells) && joins(r.Cells[k+1].R) {
+	var run []rune
+	for k := 0; k < len(r.Cells); {
+		st := r.Cells[k].St
+		cur := k == cx
+		run = run[:0]
+		for k < len(r.Cells) && r.Cells[k].St == st && (k == cx) == cur {
+			run = append(run, r.Cells[k].R)
 			k++
-			text = append(text, r.Cells[k].R)
+			// A variation selector or a combining mark goes into the same styled text as the
+			// rune before it. An escape sequence between them breaks the glyph in the terminal.
+			for k < len(r.Cells) && joins(r.Cells[k].R) {
+				run = append(run, r.Cells[k].R)
+				k++
+			}
+			if cur {
+				break
+			}
 		}
-		b.WriteString(st.Render(string(text)))
+		var style lipgloss.Style // a cell without a style shows as plain text
+		if st != nil {
+			style = *st
+		}
+		if cur {
+			style = style.Reverse(true)
+		}
+		b.WriteString(style.Render(string(run)))
 	}
 	if cx >= len(r.Cells) && cx >= 0 { // the cursor after the last rune
 		b.WriteString(lipgloss.NewStyle().Reverse(true).Render(" "))

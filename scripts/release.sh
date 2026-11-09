@@ -8,6 +8,13 @@
 #
 # Before a release, move the [Unreleased] notes of CHANGELOG.md under "## [0.1.0] - date"
 # and commit.
+#
+# The checks before the build: go vet, the tests, the tests with the race detector, and the
+# benchmarks. The tests and the benchmarks run with a memory limit of 3 GB and no swap
+# (systemd-run), so that a leak fails the run and does not stop the computer. The benchmarks
+# of HEAD are compared with the benchmarks of the last tag (benchstat). A benchmark that is
+# more than 20% slower, with a significant difference, stops the release. If the last tag
+# has no benchmarks, or they do not compile there, the script shows a warning and goes on.
 set -eu
 
 dry=false
@@ -37,8 +44,58 @@ if ! $dry; then
 fi
 grep -q "^## \[$ver\] - " CHANGELOG.md || fail "CHANGELOG.md has no section \"## [$ver] - date\""
 
+# benchstat is pinned, so that the compare does not change between releases.
+benchstat="go run golang.org/x/perf/cmd/benchstat@v0.0.0-20261009192801-be2c69fb417e"
+benchLimit=20 # percent
+
+# capped runs a command with a memory limit of 3 GB and no swap, and a time limit.
+capped() {
+	if command -v systemd-run >/dev/null; then
+		systemd-run --user --scope -q -p MemoryMax=3G -p MemorySwapMax=0 timeout -k 5 1200 "$@"
+	else
+		echo "warning: no systemd-run, the command runs without a memory limit: $*" >&2
+		"$@"
+	fi
+}
+
+# bench runs the benchmarks of the module in the directory $1 and writes them to $2.
+bench() {
+	(cd "$1" && capped go test ./... -run '^$' -bench . -benchtime 1s -count 6) >"$2"
+}
+
 go vet ./...
-go test ./...
+capped go test ./...
+capped go test -race ./...
+
+work=$(mktemp -d)
+trap 'git worktree remove --force "$work/old" 2>/dev/null || true; rm -rf "$work"' EXIT
+bench . "$work/new.txt"
+prev=$(git describe --tags --abbrev=0 2>/dev/null || true)
+if [ -z "$prev" ]; then
+	echo "warning: no earlier tag, no benchmark compare" >&2
+	cat "$work/new.txt"
+else
+	git worktree add -q --detach "$work/old" "$prev"
+	# The benchmark files of HEAD measure the code of the last tag too.
+	git ls-files --cached --others --exclude-standard '*bench_test.go' |
+		while read -r f; do cp "$f" "$work/old/$f"; done
+	if ! bench "$work/old" "$work/old.txt" || ! grep -q '^Benchmark' "$work/old.txt"; then
+		echo "warning: the benchmarks do not run on $prev, no compare" >&2
+		cat "$work/new.txt"
+	else
+		$benchstat -format csv "$work/old.txt" "$work/new.txt" >"$work/cmp.csv"
+		$benchstat "$work/old.txt" "$work/new.txt"
+		# The first table is sec/op. A row with a significant change has "+12.34%" in
+		# column 6; benchstat writes "~" for a change that is not significant.
+		slow=$(awk -F, -v lim="$benchLimit" '
+			/sec\/op/ { on = 1; next }
+			on && $0 == "" { exit }
+			on && $6 ~ /^\+/ { v = substr($6, 2); sub(/%/, "", v); if (v + 0 > lim) print $1 " " $6 }
+		' "$work/cmp.csv")
+		[ -z "$slow" ] || fail "benchmarks more than $benchLimit% slower than $prev:
+$slow"
+	fi
+fi
 
 rm -rf dist
 mkdir dist

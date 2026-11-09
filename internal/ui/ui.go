@@ -95,25 +95,30 @@ func Box(title string, lines []string, w int, borderHex string) string {
 // pane from the pane at its right, and the top and the bottom line join it with ┬ and ┴.
 // lineHex is the color of the top line: the accent for the pane with the focus.
 func Pane(title string, lines []string, w int, lineHex, sepHex string, sep bool) string {
+	return strings.Join(PaneLines(title, lines, w, lineHex, sepHex, sep), "\n")
+}
+
+// PaneLines is Pane as lines. The lines of the text must be w-2 cells wide. Each line of
+// the result is w cells wide.
+func PaneLines(title string, lines []string, w int, lineHex, sepHex string, sep bool) []string {
 	top, sp := theme.St(lineHex), theme.St(sepHex)
 	inner := w - 2
 	end, side, bottomEnd := top.Render("─"), " ", sp.Render("─")
 	if sep {
 		end, side, bottomEnd = sp.Render("┬"), sp.Render("│"), sp.Render("┴")
 	}
-	var sb strings.Builder
+	out := make([]string, 0, len(lines)+2)
 	if title == "" {
-		sb.WriteString(top.Render(strings.Repeat("─", inner+1)) + end)
+		out = append(out, top.Render(strings.Repeat("─", inner+1))+end)
 	} else {
 		title = Trunc(title, max(0, inner-4))
 		fill := max(0, inner-3-lipgloss.Width(title))
-		sb.WriteString(top.Render("── ") + title + top.Render(" "+strings.Repeat("─", fill)) + end)
+		out = append(out, top.Render("── ")+title+top.Render(" "+strings.Repeat("─", fill))+end)
 	}
 	for _, l := range lines {
-		sb.WriteString("\n " + l + side)
+		out = append(out, " "+l+side)
 	}
-	sb.WriteString("\n" + sp.Render(strings.Repeat("─", inner+1)) + bottomEnd)
-	return sb.String()
+	return append(out, sp.Render(strings.Repeat("─", inner+1))+bottomEnd)
 }
 
 // Legend styles a key hint text such as "e edit · ? help": in each item, the key (the text

@@ -82,10 +82,20 @@ type (
 // Model is the whole UI state. Its methods change the state in place and put commands in
 // m.cmds. Update returns them in one batch.
 type Model struct {
-	opts  Options
-	cfg   config.Config
-	cache *markdown.Cache
-	tree  *tree.Tree
+	pads padCache // the padded document lines of the last frames
+	// legendKey and legendOut are the last styled hints: they change seldom, and the
+	// status line draws them in each frame.
+	legendKey, legendOut string
+	// Wheel events less than one frame apart share one frame (see holdWheel).
+	held     bool      // View gives last again: the model has wheel events that it did not lay out
+	frameDue bool      // a frameMsg will come
+	built    time.Time // the time of the last frame that View built
+	last     tea.View  // the last frame that View built
+	noHold   bool      // tests: each wheel event lays out and builds its frame
+	opts     Options
+	cfg      config.Config
+	cache    *markdown.Cache
+	tree     *tree.Tree
 
 	width, height int
 	// loadGen counts the loads. onLoad is what the current load does with the document,
@@ -237,6 +247,13 @@ func (m *Model) cmd(c tea.Cmd) {
 
 // Update runs one message, then builds the layout, then returns the queued commands.
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if cmd, ok := m.holdWheel(msg); ok {
+		return m, cmd
+	}
+	if _, ok := msg.(frameMsg); ok {
+		m.frameDue = false
+	}
+	m.held = false
 	m.update(msg)
 	m.relayout()
 	cmds := m.cmds
