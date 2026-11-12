@@ -428,16 +428,16 @@ func TestSortModes(t *testing.T) {
 		t.Fatal("default sort")
 	}
 	eq(t, names(tr), root, "adir", "zdir", "a.go", "b.txt", "C.GO", "d.md")
-	if !strings.HasSuffix(tr.Title(), " · name ↑") {
-		t.Fatal(tr.Title())
+	if tr.SortLabel() != "name ↑" {
+		t.Fatal(tr.SortLabel())
 	}
 	a := press(tr, "s")
 	if a.Kind != SortChanged || a.Text != SortTime || !a.Desc {
 		t.Fatalf("action %+v", a)
 	}
 	eq(t, names(tr), root, "zdir", "adir", "a.go", "C.GO", "b.txt", "d.md")
-	if !strings.HasSuffix(tr.Title(), " · time ↓") {
-		t.Fatal(tr.Title())
+	if tr.SortLabel() != "time ↓" {
+		t.Fatal(tr.SortLabel())
 	}
 	a = press(tr, "S")
 	if a.Kind != SortChanged || a.Text != SortTime || a.Desc {
@@ -456,8 +456,8 @@ func TestSortModes(t *testing.T) {
 		t.Fatalf("type %v %v", m, desc)
 	}
 	eq(t, names(tr), root, "adir", "zdir", "a.go", "C.GO", "d.md", "b.txt")
-	if !strings.HasSuffix(tr.Title(), " · type ↑") {
-		t.Fatal(tr.Title())
+	if tr.SortLabel() != "type ↑" {
+		t.Fatal(tr.SortLabel())
 	}
 	press(tr, "S")
 	eq(t, names(tr), root, "adir", "zdir", "b.txt", "d.md", "C.GO", "a.go")
@@ -477,8 +477,9 @@ func TestSortKeepsCursorAndFilterTitle(t *testing.T) {
 	}
 	press(tr, "/")
 	typ(tr, "go")
-	if !strings.HasSuffix(tr.Title(), " · time ↓ · /go") {
-		t.Fatal(tr.Title())
+	// The sort is in the bottom border, not in the title.
+	if ti := tr.Title(); !strings.HasSuffix(ti, " · /go") || strings.Contains(ti, "time") {
+		t.Fatal(ti)
 	}
 	press(tr, "enter")
 	press(tr, "S")

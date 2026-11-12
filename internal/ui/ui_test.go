@@ -34,3 +34,21 @@ func TestWrapHint(t *testing.T) {
 		t.Errorf("trunc = %q", Trunc("hello world", 5))
 	}
 }
+
+func TestPaneLinesFoot(t *testing.T) {
+	lines := PaneLinesFoot("T", "name ↑", PadLines([]string{"a"}, 18, 1), 20, "#888888", "#444444", true)
+	bottom := ansi.Strip(lines[len(lines)-1])
+	if bottom != strings.Repeat("─", 8)+" name ↑ ───┴" {
+		t.Fatalf("bottom %q", bottom)
+	}
+	for i, l := range lines {
+		if w := lipgloss.Width(l); w != 20 {
+			t.Fatalf("line %d width %d: %q", i, w, ansi.Strip(l))
+		}
+	}
+	// Too narrow for the label: a plain line.
+	lines = PaneLinesFoot("T", "name ↑", PadLines([]string{"a"}, 8, 1), 10, "#888888", "#444444", true)
+	if bottom := ansi.Strip(lines[len(lines)-1]); bottom != strings.Repeat("─", 9)+"┴" {
+		t.Fatalf("narrow bottom %q", bottom)
+	}
+}

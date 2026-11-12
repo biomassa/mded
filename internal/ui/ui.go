@@ -101,6 +101,12 @@ func Pane(title string, lines []string, w int, lineHex, sepHex string, sep bool)
 // PaneLines is Pane as lines. The lines of the text must be w-2 cells wide. Each line of
 // the result is w cells wide.
 func PaneLines(title string, lines []string, w int, lineHex, sepHex string, sep bool) []string {
+	return PaneLinesFoot(title, "", lines, w, lineHex, sepHex, sep)
+}
+
+// PaneLinesFoot is PaneLines with a label at the right end of the bottom line. If the pane
+// is too narrow for the label, the bottom line has no label.
+func PaneLinesFoot(title, foot string, lines []string, w int, lineHex, sepHex string, sep bool) []string {
 	top, sp := theme.St(lineHex), theme.St(sepHex)
 	inner := w - 2
 	end, side, bottomEnd := top.Render("─"), " ", sp.Render("─")
@@ -117,6 +123,9 @@ func PaneLines(title string, lines []string, w int, lineHex, sepHex string, sep 
 	}
 	for _, l := range lines {
 		out = append(out, " "+l+side)
+	}
+	if fw := lipgloss.Width(foot); foot != "" && inner-4-fw >= 1 {
+		return append(out, sp.Render(strings.Repeat("─", inner-4-fw)+" ")+foot+sp.Render(" ───")+bottomEnd)
 	}
 	return append(out, sp.Render(strings.Repeat("─", inner+1))+bottomEnd)
 }

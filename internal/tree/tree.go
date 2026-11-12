@@ -214,8 +214,9 @@ func (t *Tree) resort() {
 	t.vis()
 }
 
-// sortLabel returns the sort mode and an arrow for the direction, for the title.
-func (t *Tree) sortLabel() string {
+// SortLabel returns the sort mode and an arrow for the direction, for the bottom border of
+// the sidebar.
+func (t *Tree) SortLabel() string {
 	arrow := "↑"
 	if t.sortDesc {
 		arrow = "↓"
@@ -295,7 +296,6 @@ func (t *Tree) Title() string {
 			p = "~" + p[len(home):]
 		}
 	}
-	p += " · " + t.sortLabel()
 	if t.filter != "" {
 		p += " · /" + t.filter
 	}

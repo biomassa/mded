@@ -56,12 +56,13 @@ func (m *Model) screen() string {
 	if m.showTree {
 		tr := m.treeRect()
 		border := theme.Border
-		title := theme.St(theme.Muted).Bold(true).Render(m.tree.Title())
+		st := theme.St(theme.Muted).Bold(true)
 		if m.focus == focusTree {
 			border = theme.Accent
-			title = theme.St(theme.Fg(theme.Accent)).Bold(true).Render(m.tree.Title())
+			st = theme.St(theme.Fg(theme.Accent)).Bold(true)
 		}
-		panes = append(panes, ui.PaneLines(title, ui.PadLines(m.tree.View(tr.w-2, tr.h-2, m.focus == focusTree), tr.w-2, tr.h-2), tr.w, border, theme.Border, true))
+		title, foot := st.Render(m.tree.Title()), st.Render(m.tree.SortLabel())
+		panes = append(panes, ui.PaneLinesFoot(title, foot, ui.PadLines(m.tree.View(tr.w-2, tr.h-2, m.focus == focusTree), tr.w-2, tr.h-2), tr.w, border, theme.Border, true))
 	}
 	border := theme.Border
 	title := theme.St(theme.Muted).Bold(true).Render(m.doc.title())

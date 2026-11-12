@@ -712,8 +712,13 @@ func TestSidebarSortSaved(t *testing.T) {
 	if mode != "time" || !desc || m.cfg.SidebarSort != "time" {
 		t.Fatalf("saved %q %v", mode, desc)
 	}
-	if !strings.Contains(m.tree.Title(), "time ↓") {
-		t.Fatal(m.tree.Title())
+	if m.tree.SortLabel() != "time ↓" {
+		t.Fatal(m.tree.SortLabel())
+	}
+	// The sort is in the bottom border of the sidebar.
+	lines := strings.Split(ansi.Strip(m.View().Content), "\n")
+	if bottom := lines[len(lines)-2]; !strings.Contains(bottom, " time ↓ ───┴") {
+		t.Fatalf("bottom %q", bottom)
 	}
 }
 
