@@ -7,6 +7,17 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-11-12
+
+### Added
+
+- `install.sh` installs the latest release binary for Linux or macOS. You do not need Go. The script checks the SHA256 digest of the archive. To use it:
+  `curl -fsSL https://raw.githubusercontent.com/biomassa/mded/main/install.sh | bash`
+
+### Changed
+
+- The sidebar shows the sort mode in its bottom border, not in its title. Before, a long path could hide the sort mode.
+
 ## [0.3.3] - 2026-11-09
 
 ### Changed
@@ -129,7 +140,8 @@ The release binaries of 0.1.3 already have this change. `go install` of 0.1.3 do
 - Color themes from godoist, with a theme picker (`T`). Each heading level has its own color in all themes.
 - A config file: `~/.config/mded/config.toml`.
 
-[Unreleased]: https://github.com/biomassa/mded/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/biomassa/mded/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/biomassa/mded/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/biomassa/mded/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/biomassa/mded/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/biomassa/mded/compare/v0.3.0...v0.3.1
