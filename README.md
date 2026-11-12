@@ -20,9 +20,42 @@ mded is a markdown viewer and editor for the terminal.
 
 ## Installation
 
+### Install a release binary
+
+Each [release](https://github.com/biomassa/mded/releases) has binaries for Linux and macOS (amd64 and arm64). You do not need Go for them.
+
+The install script downloads the latest release for your system, checks its SHA256 digest, and installs `mded` in `~/.local/bin`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/biomassa/mded/main/install.sh | bash
+```
+
+To install in a different directory, set `INSTALL_DIR`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/biomassa/mded/main/install.sh | INSTALL_DIR=/usr/local/bin bash
+```
+
+If you prefer to read the script before you run it, download it, read it, and run it:
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/biomassa/mded/main/install.sh
+less install.sh
+bash install.sh
+```
+
+To install without the script, download the archive for your system, then extract `mded` to a directory in your `PATH`:
+
+```sh
+tar -xzf mded_0.3.3_linux_amd64.tar.gz
+install mded_0.3.3_linux_amd64/mded ~/.local/bin/
+```
+
+On macOS, a binary that you download with a browser can get a quarantine flag. If macOS refuses to start it, remove the flag with `xattr -d com.apple.quarantine ~/.local/bin/mded`.
+
 ### Install Go
 
-If you do not have Go, install it with the package manager of your system.
+You need Go only for the options below. If you do not have Go, install it with the package manager of your system.
 
 macOS ([Homebrew](https://brew.sh)):
 
@@ -69,18 +102,9 @@ Examine the version with `go version`. Some distributions have a Go version that
 GOTOOLCHAIN=go1.27.1 go install -trimpath -ldflags="-s -w" github.com/biomassa/mded/cmd/mded@latest
 ```
 
-### Install mded
+### Install with Go
 
-Each [release](https://github.com/biomassa/mded/releases) has binaries for Linux and macOS (amd64 and arm64). You do not need Go for them. Download the archive for your system, then extract `mded` to a directory in your `PATH`:
-
-```sh
-tar -xzf mded_0.3.3_linux_amd64.tar.gz
-install mded_0.3.3_linux_amd64/mded ~/.local/bin/
-```
-
-On macOS, a downloaded binary can get a quarantine flag. If macOS refuses to start it, remove the flag with `xattr -d com.apple.quarantine ~/.local/bin/mded`.
-
-Or install the latest release with Go:
+To install the latest release with Go:
 
 ```sh
 go install -trimpath -ldflags="-s -w" github.com/biomassa/mded/cmd/mded@latest
@@ -259,7 +283,7 @@ mded shows pictures in terminals with the kitty graphics protocol: kitty and Gho
 
 `ctrl+e` and `alt+h` also show a hidden sidebar.
 
-Directories always come first. The title of the sidebar shows the sort, for example `~/notes · time ↓`. Name and type sort up, time and size sort down (the newest and the largest first). mded saves the sort in the config file.
+Directories always come first. The bottom border of the sidebar shows the sort, for example `time ↓`. Name and type sort up, time and size sort down (the newest and the largest first). mded saves the sort in the config file.
 
 Directories show in the accent color. Markdown files show in the text color, and other files in a muted color.
 
